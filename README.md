@@ -1,149 +1,201 @@
-instructions to take out camera pin: https://www.youtube.com/watch?v=bWz1-wV8AU4
+# MQTT Button State Monitor
 
-## Quick Start - Terminal Commands
+A professional MQTT-based system for monitoring button states from a Raspberry Pi and displaying them in a real-time web dashboard.
 
-### On Raspberry Pi
+## Project Structure
 
-```bash
-# Navigate to project directory
-cd ~/IDD-ASL-Alexa
-
-# Install dependencies (first time only)
-pip install -r requirements.txt
-
-# Run the button publisher
-python3 mqtt_module.py
+```
+IDD-ASL-Alexa/
+├── mqtt/                    # MQTT package
+│   ├── __init__.py         # Package initialization
+│   ├── config.py           # Configuration settings
+│   ├── publisher.py        # Raspberry Pi button publisher
+│   ├── subscriber.py       # MQTT message subscriber
+│   ├── web_server.py       # Flask web server
+│   └── templates/          # HTML templates
+│       └── dashboard.html   # Web dashboard template
+├── publish.py              # Entry point for publisher (Raspberry Pi)
+├── dashboard.py            # Entry point for web server (Laptop)
+├── requirements.txt        # Python dependencies
+└── README.md              # This file
 ```
 
-### On Laptop
+## Features
 
-```bash
-# Navigate to project directory
-cd ~/IDD-ASL-Alexa
+- **Real-time Updates**: WebSocket-based real-time button state updates
+- **Event-Driven**: Only publishes when button states change
+- **Web Dashboard**: Beautiful, responsive web interface
+- **Activity Feed**: History of button events
+- **MQTT Support**: Works with any MQTT broker
+- **Modular Design**: Clean separation of concerns
 
-# Install dependencies (first time only)
-pip install -r requirements.txt
+## Installation
 
-# Run the web dashboard server
-python3 mqtt_hub.py
+### Prerequisites
 
-# The dashboard will be available at:
-# http://localhost:8080
-```
-
-## Running the Scripts
+- Python 3.7+
+- Raspberry Pi with MiniPiTFT (for publisher)
+- MQTT broker access (default: public HiveMQ broker)
 
 ### Setup
 
-1. **Install dependencies** (on both Raspberry Pi and laptop):
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd IDD-ASL-Alexa
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+   **Note**: On your laptop, you can skip Raspberry Pi hardware libraries:
+   ```bash
+   pip install "paho-mqtt<2.0" flask flask-socketio
+   ```
+
+## Usage
+
+### On Raspberry Pi (Publisher)
+
+Run the button publisher to monitor buttons and publish state changes:
 
 ```bash
-pip install -r requirements.txt
-```
-
-**Note**: On your laptop, you can skip the Raspberry Pi hardware libraries. Install only MQTT:
-```bash
-pip install "paho-mqtt<2.0"
-```
-
-### Running on Raspberry Pi (`mqtt_module.py`)
-
-This script reads button states from the MiniPiTFT and publishes them to MQTT.
-
-```bash
-python3 mqtt_module.py
+python3 publish.py
 ```
 
 **What it does:**
-- Connects to the MQTT broker (default: `broker.hivemq.com`)
-- Monitors button A (D23) and button B (D24) states continuously
-- Publishes button states to the topic `IDD/button/state` only when state changes
+- Connects to MQTT broker (default: `broker.hivemq.com`)
+- Monitors button A (D23) and button B (D24) continuously
+- Publishes button states to topic `IDD/button/state` only when state changes
 - Press Ctrl+C to stop
 
-### Running on Laptop (`mqtt_hub.py`)
+### On Laptop (Web Dashboard)
 
-This script runs a web server that subscribes to MQTT and displays button states in a web dashboard.
+Run the web dashboard server:
 
 ```bash
-python3 mqtt_hub.py
+python3 dashboard.py
 ```
 
 **What it does:**
-- Connects to the MQTT broker (default: `broker.hivemq.com`)
-- Subscribes to the topic `IDD/button/state`
-- Starts a web server on `http://localhost:8080`
-- Serves a real-time dashboard showing button states
+- Connects to MQTT broker (default: `broker.hivemq.com`)
+- Subscribes to topic `IDD/button/state`
+- Starts web server on `http://localhost:8080`
+- Serves real-time dashboard showing button states
 - Press Ctrl+C to stop
 
 ### Running Both Together
 
 1. **Start the web dashboard on your laptop**:
    ```bash
-   python3 mqtt_hub.py
+   python3 dashboard.py
    ```
    Then open your browser to: `http://localhost:8080`
 
-2. **Start the module on Raspberry Pi** (to send messages):
+2. **Start the publisher on Raspberry Pi**:
    ```bash
-   python3 mqtt_module.py
+   python3 publish.py
    ```
 
 3. Press buttons on the Raspberry Pi and watch the state updates appear in real-time on the web dashboard!
 
-## Web Dashboard
+## Configuration
 
-The `mqtt_hub.py` script includes a built-in web dashboard that visualizes button states in real-time.
+Configuration is centralized in `mqtt/config.py` and can be overridden with environment variables:
 
-**Features:**
-- Real-time button state visualization
-- Visual indicators (ON/OFF, PRESSED/RELEASED)
-- Activity feed showing button event history
-- Connection status indicator
-- Responsive design for mobile and desktop
-- No external dependencies - everything runs through the Python script
-
-## MQTT Configuration for Home WiFi
-
-The MQTT configuration now supports environment variables for easy switching between school and home networks.
-
-### Option 1: Use a Public MQTT Broker (Easiest)
-
-Set these environment variables before running:
+### MQTT Configuration
 
 ```bash
-export MQTT_BROKER='test.mosquitto.org'
-export MQTT_USERNAME=''
-export MQTT_PASSWORD=''
+export MQTT_BROKER='broker.hivemq.com'  # MQTT broker hostname
+export MQTT_PORT='1883'                  # MQTT broker port
+export MQTT_TOPIC='IDD/button/state'     # MQTT topic
+export MQTT_USERNAME=''                  # Optional: MQTT username
+export MQTT_PASSWORD=''                  # Optional: MQTT password
 ```
 
-Or use HiveMQ's public broker:
+### Web Server Configuration
+
 ```bash
-export MQTT_BROKER='broker.hivemq.com'
-export MQTT_USERNAME=''
-export MQTT_PASSWORD=''
+export PORT='8080'                       # Web server port (default: 8080)
+export HOST='0.0.0.0'                    # Web server host (default: 0.0.0.0)
 ```
 
-### Option 2: Use a Local MQTT Broker
+### School Network Configuration
 
-If you have a Raspberry Pi or another device running Mosquitto on your home network:
+To use the school network broker:
 
-1. Find the IP address of your MQTT broker (e.g., `192.168.1.100`)
-2. Set the environment variable:
-```bash
-export MQTT_BROKER='192.168.1.100'
-export MQTT_USERNAME='your_username'  # If authentication is required
-export MQTT_PASSWORD='your_password'  # If authentication is required
-```
-
-### Option 3: Edit the Code Directly
-
-You can also modify the default values in `mqtt_module.py` and `mqtt_hub.py` directly.
-
-### Switching Back to School Network
-
-Simply unset the environment variables or use:
 ```bash
 export MQTT_BROKER='farlab.infosci.cornell.edu'
 export MQTT_USERNAME='idd'
 export MQTT_PASSWORD='device@theFarm'
 ```
+
+## Architecture
+
+### Components
+
+1. **Publisher** (`mqtt/publisher.py`): 
+   - Runs on Raspberry Pi
+   - Monitors GPIO buttons
+   - Publishes state changes to MQTT
+
+2. **Subscriber** (`mqtt/subscriber.py`):
+   - Receives MQTT messages
+   - Manages button state
+   - Maintains activity history
+
+3. **Web Server** (`mqtt/web_server.py`):
+   - Flask application
+   - Serves dashboard HTML
+   - WebSocket communication for real-time updates
+
+4. **Configuration** (`mqtt/config.py`):
+   - Centralized configuration
+   - Environment variable support
+
+## Development
+
+### Project Structure
+
+- **`mqtt/`**: Core MQTT package with modular components
+- **`publish.py`**: Entry point for Raspberry Pi publisher
+- **`dashboard.py`**: Entry point for web dashboard server
+- **`mqtt/templates/`**: HTML templates for web interface
+
+### Adding New Features
+
+1. **New MQTT topics**: Update `mqtt/config.py`
+2. **New buttons**: Update `mqtt/config.py` ButtonConfig
+3. **UI changes**: Edit `mqtt/templates/dashboard.html`
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 8080 is in use, set a different port:
+```bash
+PORT=8081 python3 dashboard.py
+```
+
+### MQTT Connection Issues
+
+- Check broker hostname and port
+- Verify network connectivity
+- Check firewall settings
+- Review MQTT broker logs
+
+### Button Not Detected
+
+- Verify GPIO pin configuration in `mqtt/config.py`
+- Check hardware connections
+- Ensure proper permissions for GPIO access
+
+## License
+
+[Add your license here]
+
+## Contributing
+
+[Add contribution guidelines here]
