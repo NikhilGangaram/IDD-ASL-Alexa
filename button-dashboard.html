@@ -300,8 +300,9 @@
 
     <script>
         // MQTT Configuration
-        const MQTT_BROKER = 'test.mosquitto.org';
-        const MQTT_PORT = 8080; // WebSocket port for browser
+        // Using HiveMQ public broker (browser-friendly WebSocket support)
+        const MQTT_BROKER = 'broker.hivemq.com';
+        const MQTT_PORT = 8000; // WebSocket port for browser
         const MQTT_TOPIC = 'IDD/button/state';
         
         // Button states
@@ -317,6 +318,8 @@
         function initMQTT() {
             const clientId = 'button-dashboard-' + Math.random().toString(16).substr(2, 8);
             
+            console.log('Connecting to MQTT broker:', MQTT_BROKER + ':' + MQTT_PORT);
+            
             mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
 
             mqttClient.onConnectionLost = onConnectionLost;
@@ -325,7 +328,9 @@
             mqttClient.connect({
                 onSuccess: onConnect,
                 onFailure: onConnectFailure,
-                useSSL: false
+                useSSL: false,
+                timeout: 10,
+                keepAliveInterval: 60
             });
         }
 
@@ -340,11 +345,21 @@
 
         function onConnectFailure(error) {
             console.error('Failed to connect to MQTT broker:', error);
+            console.error('Error details:', error.errorMessage || error);
             updateConnectionStatus(false);
+            
+            // Show error message
+            const connectionText = document.getElementById('connectionText');
+            if (error.errorMessage) {
+                connectionText.textContent = 'Connection Failed: ' + error.errorMessage;
+            } else {
+                connectionText.textContent = 'Connection Failed - Check console';
+            }
             
             // Try to reconnect after 5 seconds
             setTimeout(() => {
                 console.log('Attempting to reconnect...');
+                connectionText.textContent = 'Reconnecting...';
                 initMQTT();
             }, 5000);
         }

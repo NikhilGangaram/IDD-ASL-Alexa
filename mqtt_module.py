@@ -17,7 +17,7 @@ import os
 # Default: Public Mosquitto broker (no authentication required)
 # To use school network: export MQTT_BROKER='farlab.infosci.cornell.edu' MQTT_USERNAME='idd' MQTT_PASSWORD='device@theFarm'
 
-MQTT_BROKER = os.getenv('MQTT_BROKER', 'test.mosquitto.org')  # Default: public Mosquitto broker
+MQTT_BROKER = os.getenv('MQTT_BROKER', 'broker.hivemq.com')  # Default: HiveMQ public broker (browser-friendly)
 MQTT_PORT = int(os.getenv('MQTT_PORT', '1883'))
 MQTT_TOPIC = os.getenv('MQTT_TOPIC', 'IDD/button/state')
 MQTT_USERNAME = os.getenv('MQTT_USERNAME', '')  # Empty for public brokers
