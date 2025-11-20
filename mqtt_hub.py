@@ -33,11 +33,11 @@ button_states = {
 def on_connect(client, userdata, flags, rc):
     """MQTT connection callback"""
     if rc == 0:
-        print(f'✓ MQTT connected to {MQTT_BROKER}:{MQTT_PORT}')
+        print(f'[OK] MQTT connected to {MQTT_BROKER}:{MQTT_PORT}')
         client.subscribe(MQTT_TOPIC)
-        print(f'✓ Subscribed to {MQTT_TOPIC}')
+        print(f'[OK] Subscribed to {MQTT_TOPIC}')
     else:
-        print(f'✗ MQTT connection failed: {rc}')
+        print(f'[FAIL] MQTT connection failed: {rc}')
 
 
 def on_message(client, userdata, msg):
@@ -49,7 +49,7 @@ def on_message(client, userdata, msg):
         
         # Validate button_id
         if button_id not in ['A', 'B']:
-            print(f'⚠️  Unknown button_id: {button_id}')
+            print(f'[WARN] Unknown button_id: {button_id}')
             return
         
         # Update state
@@ -68,10 +68,10 @@ def on_message(client, userdata, msg):
         display_state_summary()
         
     except json.JSONDecodeError as e:
-        print(f'⚠️  Failed to parse JSON: {e}')
+        print(f'[WARN] Failed to parse JSON: {e}')
         print(f'   Raw payload: {msg.payload.decode("UTF-8", errors="replace")}')
     except Exception as e:
-        print(f'⚠️  Error processing message: {e}')
+        print(f'[WARN] Error processing message: {e}')
 
 
 def display_state_summary():
@@ -107,7 +107,7 @@ def setup_mqtt():
         time.sleep(1)
         return True
     except Exception as e:
-        print(f'⚠️  MQTT setup failed: {e}')
+        print(f'[WARN] MQTT setup failed: {e}')
         return False
 
 
@@ -118,7 +118,7 @@ def main():
     print("=" * 60)
     
     if not setup_mqtt():
-        print("✗ Failed to setup MQTT. Exiting.")
+        print("[FAIL] Failed to setup MQTT. Exiting.")
         return
     
     print("=" * 60)
@@ -138,7 +138,7 @@ def main():
         if mqtt_client:
             mqtt_client.loop_stop()
             mqtt_client.disconnect()
-        print("✓ MQTT client disconnected")
+        print("[OK] MQTT client disconnected")
 
 
 if __name__ == '__main__':

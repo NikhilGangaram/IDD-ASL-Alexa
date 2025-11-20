@@ -385,7 +385,7 @@
     <!-- Header -->
     <header class="header">
         <div class="logo">
-            <span>🏠</span>
+            <span>HOME</span>
             <span>ASL Smart Home</span>
         </div>
         <div class="connection-status">
@@ -415,7 +415,7 @@
 
     <!-- Visual Feedback Overlay -->
     <div class="feedback-overlay" id="feedbackOverlay">
-        <div class="feedback-icon" id="feedbackIcon">✓</div>
+        <div class="feedback-icon" id="feedbackIcon">OK</div>
         <div class="feedback-text" id="feedbackText">Command Executed</div>
     </div>
 
@@ -737,7 +737,7 @@
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
-                            <div class="device-icon">💡</div>
+                            <div class="device-icon">LIGHT</div>
                         </div>
                         <div>
                             <div class="device-name">${device.name}</div>
@@ -774,7 +774,7 @@
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
-                            <div class="device-icon">🌡️</div>
+                            <div class="device-icon">TEMP</div>
                         </div>
                         <div>
                             <div class="device-name">${device.name}</div>
@@ -805,7 +805,7 @@
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
-                            <div class="device-icon">🚪</div>
+                            <div class="device-icon">DOOR</div>
                         </div>
                         <div>
                             <div class="device-name">${device.name}</div>
@@ -820,10 +820,10 @@
                         <div class="camera-view">
                             ${device.detection ? 
                                 `<div class="detection-alert ${device.detection}">
-                                    ${device.detection === 'person' ? '👤 Person' : '📦 Parcel'} Detected
+                                    ${device.detection === 'person' ? 'PERSON Detected' : 'PARCEL Detected'}
                                 </div>` : 
                                 `<div class="camera-placeholder">
-                                    <div>📷</div>
+                                    <div>CAMERA</div>
                                     <div>Camera Feed</div>
                                 </div>`
                             }
@@ -842,7 +842,7 @@
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
-                            <div class="device-icon">🪟</div>
+                            <div class="device-icon">WINDOW</div>
                         </div>
                         <div>
                             <div class="device-name">${device.name}</div>
@@ -873,7 +873,7 @@
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
-                            <div class="device-icon">🔒</div>
+                            <div class="device-icon">LOCK</div>
                         </div>
                         <div>
                             <div class="device-name">${device.name}</div>
@@ -935,7 +935,7 @@
                 const time = command.timestamp.toLocaleTimeString();
                 
                 item.innerHTML = `
-                    <div class="command-gesture">👋 ${command.gesture}</div>
+                    <div class="command-gesture">${command.gesture}</div>
                     <div class="command-action">${command.action}</div>
                     <div class="command-time">${time}</div>
                 `;

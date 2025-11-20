@@ -1,5 +1,62 @@
 instructions to take out camera pin: https://www.youtube.com/watch?v=bWz1-wV8AU4
 
+## Running the Scripts
+
+### Setup
+
+1. **Install dependencies** (on both Raspberry Pi and laptop):
+
+```bash
+pip install -r requirements.txt
+```
+
+**Note**: On your laptop, you can skip the Raspberry Pi hardware libraries. Install only MQTT:
+```bash
+pip install "paho-mqtt<2.0"
+```
+
+### Running on Raspberry Pi (`mqtt_module.py`)
+
+This script reads button states from the MiniPiTFT and publishes them to MQTT.
+
+```bash
+python3 mqtt_module.py
+```
+
+**What it does:**
+- Connects to the MQTT broker (default: `test.mosquitto.org`)
+- Reads button A (D23) and button B (D24) states every second
+- Publishes button states to the topic `IDD/button/state`
+- Press Ctrl+C to stop
+
+### Running on Laptop (`mqtt_hub.py`)
+
+This script subscribes to MQTT and displays button states received from the Raspberry Pi.
+
+```bash
+python3 mqtt_hub.py
+```
+
+**What it does:**
+- Connects to the MQTT broker (default: `test.mosquitto.org`)
+- Subscribes to the topic `IDD/button/state`
+- Displays button state updates in real-time
+- Press Ctrl+C to stop
+
+### Running Both Together
+
+1. **Start the hub on your laptop first** (to receive messages):
+   ```bash
+   python3 mqtt_hub.py
+   ```
+
+2. **Then start the module on Raspberry Pi** (to send messages):
+   ```bash
+   python3 mqtt_module.py
+   ```
+
+3. Press buttons on the Raspberry Pi and watch the state updates appear on your laptop!
+
 ## MQTT Configuration for Home WiFi
 
 The MQTT configuration now supports environment variables for easy switching between school and home networks.
