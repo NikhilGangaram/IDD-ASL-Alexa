@@ -17,30 +17,18 @@ python3 mqtt_module.py
 
 ### On Laptop
 
-**Option 1: Web Dashboard (Recommended)**
-
 ```bash
 # Navigate to project directory
 cd ~/IDD-ASL-Alexa
 
-# Start local web server
-python3 -m http.server 8000
+# Install dependencies (first time only)
+pip install -r requirements.txt
 
-# Open browser and go to:
-# http://localhost:8000/button-dashboard.html
-```
-
-**Option 2: Terminal Output**
-
-```bash
-# Navigate to project directory
-cd ~/IDD-ASL-Alexa
-
-# Install MQTT library (first time only)
-pip install "paho-mqtt<2.0"
-
-# Run the button receiver
+# Run the web dashboard server
 python3 mqtt_hub.py
+
+# The dashboard will be available at:
+# http://localhost:5000
 ```
 
 ## Running the Scripts
@@ -67,64 +55,44 @@ python3 mqtt_module.py
 ```
 
 **What it does:**
-- Connects to the MQTT broker (default: `test.mosquitto.org`)
+- Connects to the MQTT broker (default: `broker.hivemq.com`)
 - Monitors button A (D23) and button B (D24) states continuously
 - Publishes button states to the topic `IDD/button/state` only when state changes
 - Press Ctrl+C to stop
 
 ### Running on Laptop (`mqtt_hub.py`)
 
-This script subscribes to MQTT and displays button states received from the Raspberry Pi.
+This script runs a web server that subscribes to MQTT and displays button states in a web dashboard.
 
 ```bash
 python3 mqtt_hub.py
 ```
 
 **What it does:**
-- Connects to the MQTT broker (default: `test.mosquitto.org`)
+- Connects to the MQTT broker (default: `broker.hivemq.com`)
 - Subscribes to the topic `IDD/button/state`
-- Displays button state updates in real-time
+- Starts a web server on `http://localhost:5000`
+- Serves a real-time dashboard showing button states
 - Press Ctrl+C to stop
 
 ### Running Both Together
 
-1. **Start the hub on your laptop first** (to receive messages):
+1. **Start the web dashboard on your laptop**:
    ```bash
    python3 mqtt_hub.py
    ```
+   Then open your browser to: `http://localhost:5000`
 
-2. **Then start the module on Raspberry Pi** (to send messages):
+2. **Start the module on Raspberry Pi** (to send messages):
    ```bash
    python3 mqtt_module.py
    ```
 
-3. Press buttons on the Raspberry Pi and watch the state updates appear on your laptop!
+3. Press buttons on the Raspberry Pi and watch the state updates appear in real-time on the web dashboard!
 
 ## Web Dashboard
 
-A web-based dashboard is available to visualize button states in real-time through your browser.
-
-### Using the Web Dashboard
-
-1. **Open the dashboard** in your web browser:
-   - Simply open `button-dashboard.html` in any modern web browser
-   - Or serve it using a local web server:
-     ```bash
-     # Python 3
-     python3 -m http.server 8000
-     
-     # Then open: http://localhost:8000/button-dashboard.html
-     ```
-
-2. **Start the Raspberry Pi module**:
-   ```bash
-   python3 mqtt_module.py
-   ```
-
-3. **View button states**:
-   - The dashboard will automatically connect to the MQTT broker
-   - Button states update in real-time when buttons are pressed/released
-   - An activity feed shows the history of button events
+The `mqtt_hub.py` script includes a built-in web dashboard that visualizes button states in real-time.
 
 **Features:**
 - Real-time button state visualization
@@ -132,6 +100,7 @@ A web-based dashboard is available to visualize button states in real-time throu
 - Activity feed showing button event history
 - Connection status indicator
 - Responsive design for mobile and desktop
+- No external dependencies - everything runs through the Python script
 
 ## MQTT Configuration for Home WiFi
 

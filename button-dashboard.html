@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Button State Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
     <style>
         :root {
             --primary: #2563eb;
@@ -300,8 +300,9 @@
 
     <script>
         // MQTT Configuration
-        const MQTT_BROKER = 'test.mosquitto.org';
-        const MQTT_PORT = 8080; // WebSocket port for browser
+        // Using HiveMQ public broker for better WebSocket support in browsers
+        const MQTT_BROKER = 'broker.hivemq.com';
+        const MQTT_PORT = 8000; // WebSocket port for browser
         const MQTT_TOPIC = 'IDD/button/state';
         
         // Button states
@@ -315,32 +316,57 @@
 
         // Initialize MQTT connection
         function initMQTT() {
-            const clientId = 'button-dashboard-' + Math.random().toString(16).substr(2, 8);
-            
-            mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
+            // Check if Paho MQTT library is loaded
+            if (typeof Paho === 'undefined' || typeof Paho.MQTT === 'undefined') {
+                console.error('Paho MQTT library not loaded. Retrying in 1 second...');
+                updateConnectionStatus(false);
+                setTimeout(initMQTT, 1000);
+                return;
+            }
 
-            mqttClient.onConnectionLost = onConnectionLost;
-            mqttClient.onMessageArrived = onMessageArrived;
+            try {
+                const clientId = 'button-dashboard-' + Math.random().toString(16).substr(2, 8);
+                
+                mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
 
-            mqttClient.connect({
-                onSuccess: onConnect,
-                onFailure: onConnectFailure,
-                useSSL: false
-            });
+                mqttClient.onConnectionLost = onConnectionLost;
+                mqttClient.onMessageArrived = onMessageArrived;
+
+                mqttClient.connect({
+                    onSuccess: onConnect,
+                    onFailure: onConnectFailure,
+                    useSSL: false,
+                    reconnect: true
+                });
+            } catch (error) {
+                console.error('Error initializing MQTT:', error);
+                updateConnectionStatus(false);
+                // Retry after 2 seconds
+                setTimeout(initMQTT, 2000);
+            }
         }
 
         function onConnect() {
-            console.log('Connected to MQTT broker');
+            console.log('Connected to MQTT broker:', MQTT_BROKER);
             updateConnectionStatus(true);
             
             // Subscribe to button state topic
-            mqttClient.subscribe(MQTT_TOPIC);
+            mqttClient.subscribe(MQTT_TOPIC, {qos: 0});
             console.log('Subscribed to topic: ' + MQTT_TOPIC);
         }
 
         function onConnectFailure(error) {
             console.error('Failed to connect to MQTT broker:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
             updateConnectionStatus(false);
+            
+            // Show more helpful error message
+            const text = document.getElementById('connectionText');
+            if (error.errorCode === 7) {
+                text.textContent = 'Connection Refused - Check broker settings';
+            } else {
+                text.textContent = `Connection Failed (Code: ${error.errorCode})`;
+            }
             
             // Try to reconnect after 5 seconds
             setTimeout(() => {
@@ -449,9 +475,18 @@
             }
         }
 
-        // Initialize on page load
+        // Initialize on page load - wait for library to load
+        function waitForPaho() {
+            if (typeof Paho !== 'undefined' && typeof Paho.MQTT !== 'undefined') {
+                initMQTT();
+            } else {
+                // Check again after a short delay
+                setTimeout(waitForPaho, 100);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
-            initMQTT();
+            waitForPaho();
         });
 
         // Cleanup on page unload
