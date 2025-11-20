@@ -1,5 +1,48 @@
 instructions to take out camera pin: https://www.youtube.com/watch?v=bWz1-wV8AU4
 
+## Quick Start - Terminal Commands
+
+### On Raspberry Pi
+
+```bash
+# Navigate to project directory
+cd ~/IDD-ASL-Alexa
+
+# Install dependencies (first time only)
+pip install -r requirements.txt
+
+# Run the button publisher
+python3 mqtt_module.py
+```
+
+### On Laptop
+
+**Option 1: Web Dashboard (Recommended)**
+
+```bash
+# Navigate to project directory
+cd ~/IDD-ASL-Alexa
+
+# Start local web server
+python3 -m http.server 8000
+
+# Open browser and go to:
+# http://localhost:8000/button-dashboard.html
+```
+
+**Option 2: Terminal Output**
+
+```bash
+# Navigate to project directory
+cd ~/IDD-ASL-Alexa
+
+# Install MQTT library (first time only)
+pip install "paho-mqtt<2.0"
+
+# Run the button receiver
+python3 mqtt_hub.py
+```
+
 ## Running the Scripts
 
 ### Setup
@@ -25,8 +68,8 @@ python3 mqtt_module.py
 
 **What it does:**
 - Connects to the MQTT broker (default: `test.mosquitto.org`)
-- Reads button A (D23) and button B (D24) states every second
-- Publishes button states to the topic `IDD/button/state`
+- Monitors button A (D23) and button B (D24) states continuously
+- Publishes button states to the topic `IDD/button/state` only when state changes
 - Press Ctrl+C to stop
 
 ### Running on Laptop (`mqtt_hub.py`)
@@ -56,6 +99,39 @@ python3 mqtt_hub.py
    ```
 
 3. Press buttons on the Raspberry Pi and watch the state updates appear on your laptop!
+
+## Web Dashboard
+
+A web-based dashboard is available to visualize button states in real-time through your browser.
+
+### Using the Web Dashboard
+
+1. **Open the dashboard** in your web browser:
+   - Simply open `button-dashboard.html` in any modern web browser
+   - Or serve it using a local web server:
+     ```bash
+     # Python 3
+     python3 -m http.server 8000
+     
+     # Then open: http://localhost:8000/button-dashboard.html
+     ```
+
+2. **Start the Raspberry Pi module**:
+   ```bash
+   python3 mqtt_module.py
+   ```
+
+3. **View button states**:
+   - The dashboard will automatically connect to the MQTT broker
+   - Button states update in real-time when buttons are pressed/released
+   - An activity feed shows the history of button events
+
+**Features:**
+- Real-time button state visualization
+- Visual indicators (ON/OFF, PRESSED/RELEASED)
+- Activity feed showing button event history
+- Connection status indicator
+- Responsive design for mobile and desktop
 
 ## MQTT Configuration for Home WiFi
 
