@@ -10,13 +10,18 @@ import board
 import paho.mqtt.client as mqtt
 import json
 import uuid
+import os
 
 # MQTT Configuration
-MQTT_BROKER = 'farlab.infosci.cornell.edu'
-MQTT_PORT = 1883
-MQTT_TOPIC = 'IDD/button/state'
-MQTT_USERNAME = 'idd'
-MQTT_PASSWORD = 'device@theFarm'
+# Can be overridden with environment variables for easy switching between networks
+# Default: Public Mosquitto broker (no authentication required)
+# To use school network: export MQTT_BROKER='farlab.infosci.cornell.edu' MQTT_USERNAME='idd' MQTT_PASSWORD='device@theFarm'
+
+MQTT_BROKER = os.getenv('MQTT_BROKER', 'test.mosquitto.org')  # Default: public Mosquitto broker
+MQTT_PORT = int(os.getenv('MQTT_PORT', '1883'))
+MQTT_TOPIC = os.getenv('MQTT_TOPIC', 'IDD/button/state')
+MQTT_USERNAME = os.getenv('MQTT_USERNAME', '')  # Empty for public brokers
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', '')  # Empty for public brokers
 
 # Button Configuration
 BUTTON_A_PIN = board.D23
@@ -53,7 +58,11 @@ def setup_mqtt():
     global mqtt_client
     try:
         mqtt_client = mqtt.Client(str(uuid.uuid1()))
-        mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        
+        # Only set username/password if provided (public brokers don't need auth)
+        if MQTT_USERNAME and MQTT_PASSWORD:
+            mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        
         mqtt_client.on_connect = on_connect
         mqtt_client.on_publish = on_publish
         
