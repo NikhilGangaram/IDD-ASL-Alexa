@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MQTT Module - Raspberry Pi Button State Publisher
-Reads button states from MiniPiTFT buttons and publishes to MQTT every second
+Reads button states from MiniPiTFT buttons and publishes to MQTT when state changes
 """
 
 import time
@@ -78,7 +78,7 @@ def setup_mqtt():
 
 
 def main():
-    """Main loop - read buttons and publish state every second"""
+    """Main loop - read buttons and publish state only when it changes"""
     print("=" * 60)
     print("  MQTT Module - Button State Publisher")
     print("=" * 60)
@@ -97,45 +97,51 @@ def main():
         return
     
     print("=" * 60)
-    print("  Publishing button states every second...")
+    print("  Monitoring buttons for state changes...")
     print("  Press Ctrl+C to exit")
     print("=" * 60)
     print()
     
+    # Track previous button states
+    prev_button_a_state = None
+    prev_button_b_state = None
+    
     try:
         while True:
-            loop_start = time.time()
-            
             # Read button states (False = pressed, True = not pressed)
             button_a_state = not buttonA.value  # Invert so True = pressed
             button_b_state = not buttonB.value  # Invert so True = pressed
             
-            # Publish Button A state
-            payload_a = {
-                'button_id': 'A',
-                'state': button_a_state
-            }
-            result = mqtt_client.publish(MQTT_TOPIC, json.dumps(payload_a))
-            if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                print(f"[{time.strftime('%H:%M:%S')}] Button A: {button_a_state}")
-            else:
-                print(f"[ERROR] Failed to publish Button A state: rc={result.rc}")
+            # Check if Button A state changed
+            if button_a_state != prev_button_a_state:
+                payload_a = {
+                    'button_id': 'A',
+                    'state': button_a_state
+                }
+                result = mqtt_client.publish(MQTT_TOPIC, json.dumps(payload_a))
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    state_str = "PRESSED" if button_a_state else "RELEASED"
+                    print(f"[{time.strftime('%H:%M:%S')}] Button A: {state_str}")
+                else:
+                    print(f"[ERROR] Failed to publish Button A state: rc={result.rc}")
+                prev_button_a_state = button_a_state
             
-            # Publish Button B state
-            payload_b = {
-                'button_id': 'B',
-                'state': button_b_state
-            }
-            result = mqtt_client.publish(MQTT_TOPIC, json.dumps(payload_b))
-            if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                print(f"[{time.strftime('%H:%M:%S')}] Button B: {button_b_state}")
-            else:
-                print(f"[ERROR] Failed to publish Button B state: rc={result.rc}")
+            # Check if Button B state changed
+            if button_b_state != prev_button_b_state:
+                payload_b = {
+                    'button_id': 'B',
+                    'state': button_b_state
+                }
+                result = mqtt_client.publish(MQTT_TOPIC, json.dumps(payload_b))
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    state_str = "PRESSED" if button_b_state else "RELEASED"
+                    print(f"[{time.strftime('%H:%M:%S')}] Button B: {state_str}")
+                else:
+                    print(f"[ERROR] Failed to publish Button B state: rc={result.rc}")
+                prev_button_b_state = button_b_state
             
-            # Wait until 1 second has elapsed since loop start
-            elapsed = time.time() - loop_start
-            sleep_time = max(0, 1.0 - elapsed)
-            time.sleep(sleep_time)
+            # Small delay to avoid excessive CPU usage (check every 50ms)
+            time.sleep(0.05)
             
     except KeyboardInterrupt:
         print("\n\nShutting down...")
