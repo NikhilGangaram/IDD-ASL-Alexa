@@ -28,7 +28,7 @@ pip install -r requirements.txt
 python3 mqtt_hub.py
 
 # The dashboard will be available at:
-# http://localhost:5000
+# http://localhost:8080
 ```
 
 ## Running the Scripts
@@ -71,7 +71,7 @@ python3 mqtt_hub.py
 **What it does:**
 - Connects to the MQTT broker (default: `broker.hivemq.com`)
 - Subscribes to the topic `IDD/button/state`
-- Starts a web server on `http://localhost:5000`
+- Starts a web server on `http://localhost:8080`
 - Serves a real-time dashboard showing button states
 - Press Ctrl+C to stop
 
@@ -81,7 +81,7 @@ python3 mqtt_hub.py
    ```bash
    python3 mqtt_hub.py
    ```
-   Then open your browser to: `http://localhost:5000`
+   Then open your browser to: `http://localhost:8080`
 
 2. **Start the module on Raspberry Pi** (to send messages):
    ```bash

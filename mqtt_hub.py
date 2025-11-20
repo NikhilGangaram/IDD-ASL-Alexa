@@ -156,14 +156,17 @@ def main():
         print("[FAIL] Failed to setup MQTT. Exiting.")
         return
     
+    # Use port 8080 to avoid conflict with macOS AirPlay Receiver on port 5000
+    PORT = int(os.getenv('PORT', '8080'))
+    
     print("=" * 60)
-    print("  Starting web server on http://localhost:5000")
+    print(f"  Starting web server on http://localhost:{PORT}")
     print("  Press Ctrl+C to exit")
     print("=" * 60)
     print()
     
     try:
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+        socketio.run(app, host='0.0.0.0', port=PORT, debug=False, allow_unsafe_werkzeug=True)
     except KeyboardInterrupt:
         print("\n\nShutting down...")
     finally:
