@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -77,8 +78,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         /* Main Layout */
@@ -130,8 +138,15 @@
         }
 
         @keyframes cardPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
         }
 
         .device-header {
@@ -208,6 +223,7 @@
             background: rgba(255, 255, 255, 0.2);
             outline: none;
             -webkit-appearance: none;
+            appearance: none;
         }
 
         .slider::-webkit-slider-thumb {
@@ -263,8 +279,15 @@
         }
 
         @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         /* Command Feed */
@@ -297,6 +320,7 @@
                 opacity: 0;
                 transform: translateX(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -344,6 +368,7 @@
                 opacity: 0;
                 transform: translate(-50%, -50%) scale(0.8);
             }
+
             to {
                 opacity: 1;
                 transform: translate(-50%, -50%) scale(1);
@@ -367,7 +392,7 @@
             .main-container {
                 flex-direction: column;
             }
-            
+
             .command-feed {
                 width: 100%;
                 max-height: 300px;
@@ -381,6 +406,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
@@ -443,7 +469,7 @@
                         main: { name: 'Security System', armed: false }
                     }
                 };
-                
+
                 this.commandHistory = [];
                 this.listeners = [];
             }
@@ -503,7 +529,7 @@
                 this.ui = ui;
                 this.ws = null;
                 this.reconnectTimeout = null;
-                this.simulateConnection();
+                this.connect();
             }
 
             simulateConnection() {
@@ -515,9 +541,39 @@
             }
 
             connect() {
-                // In production, this would be:
-                // this.ws = new WebSocket('wss://asl-service.example.com');
-                // this.ws.onmessage = (event) => this.handleMessage(JSON.parse(event.data));
+                try {
+                    this.ws = new WebSocket('ws://localhost:8765');
+
+                    this.ws.onopen = () => {
+                        this.onConnect();
+                        console.log('Connected to ASL Controller');
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        this.handleMessage(data);
+                    };
+
+                    this.ws.onclose = () => {
+                        this.onDisconnect();
+                        // Try to reconnect after 3 seconds
+                        setTimeout(() => this.connect(), 3000);
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket Error:', error);
+                        this.onDisconnect();
+                    };
+                } catch (e) {
+                    console.error('Connection failed:', e);
+                    this.onDisconnect();
+                }
+            }
+
+            onDisconnect() {
+                document.querySelector('.status-indicator').classList.remove('connected');
+                document.querySelector('.status-indicator').classList.add('disconnected');
+                document.getElementById('connectionText').textContent = 'ASL Service Disconnected';
             }
 
             onConnect() {
@@ -654,7 +710,7 @@
                     Object.keys(this.state.devices.lights).forEach(key => {
                         this.state.updateDevice('lights', key, { on: false });
                     });
-                    
+
                     if (action === 'night') {
                         // Lock doors
                         this.state.updateDevice('door', 'front', { locked: true });
@@ -671,10 +727,10 @@
             simulateASLCommands() {
                 // Simulate incoming ASL commands for demonstration
                 const commands = [
-                    'LIGHTS_ON', 'TEMPERATURE_UP', 'DOOR_CHECK', 
+                    'LIGHTS_ON', 'TEMPERATURE_UP', 'DOOR_CHECK',
                     'BLINDS_OPEN', 'SECURITY_ARM'
                 ];
-                
+
                 setInterval(() => {
                     if (Math.random() > 0.7) {
                         const randomCommand = commands[Math.floor(Math.random() * commands.length)];
@@ -733,7 +789,7 @@
                 const card = document.createElement('div');
                 card.className = `device-card ${device.on ? 'active' : ''}`;
                 card.id = `lights-${id}`;
-                
+
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
@@ -762,7 +818,7 @@
                         ` : ''}
                     </div>
                 `;
-                
+
                 return card;
             }
 
@@ -770,7 +826,7 @@
                 const card = document.createElement('div');
                 card.className = 'device-card';
                 card.id = `temperature-${id}`;
-                
+
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
@@ -793,7 +849,7 @@
                         </div>
                     </div>
                 `;
-                
+
                 return card;
             }
 
@@ -801,7 +857,7 @@
                 const card = document.createElement('div');
                 card.className = `device-card ${device.locked ? '' : 'active'}`;
                 card.id = `door-${id}`;
-                
+
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
@@ -817,20 +873,10 @@
                                 onclick="toggleDoor('${id}')">
                             ${device.locked ? 'LOCKED' : 'UNLOCKED'}
                         </button>
-                        <div class="camera-view">
-                            ${device.detection ? 
-                                `<div class="detection-alert ${device.detection}">
-                                    ${device.detection === 'person' ? '👤 Person' : '📦 Parcel'} Detected
-                                </div>` : 
-                                `<div class="camera-placeholder">
-                                    <div>📷</div>
-                                    <div>Camera Feed</div>
-                                </div>`
-                            }
-                        </div>
+
                     </div>
                 `;
-                
+
                 return card;
             }
 
@@ -838,7 +884,7 @@
                 const card = document.createElement('div');
                 card.className = 'device-card';
                 card.id = `blinds-${id}`;
-                
+
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
@@ -861,7 +907,7 @@
                         </div>
                     </div>
                 `;
-                
+
                 return card;
             }
 
@@ -869,7 +915,7 @@
                 const card = document.createElement('div');
                 card.className = `device-card ${device.armed ? 'active' : ''}`;
                 card.id = `security-${id}`;
-                
+
                 card.innerHTML = `
                     <div class="device-header">
                         <div>
@@ -887,7 +933,7 @@
                         </button>
                     </div>
                 `;
-                
+
                 return card;
             }
 
@@ -903,7 +949,7 @@
                 // Re-render the specific card
                 const deviceData = this.state.devices[category][device];
                 let newCard;
-                
+
                 switch (category) {
                     case 'lights':
                         newCard = this.createLightCard(device, deviceData);
@@ -931,17 +977,17 @@
                 const list = document.getElementById('commandList');
                 const item = document.createElement('div');
                 item.className = 'command-item';
-                
+
                 const time = command.timestamp.toLocaleTimeString();
-                
+
                 item.innerHTML = `
                     <div class="command-gesture">👋 ${command.gesture}</div>
                     <div class="command-action">${command.action}</div>
                     <div class="command-time">${time}</div>
                 `;
-                
+
                 list.insertBefore(item, list.firstChild);
-                
+
                 // Keep only last 10 commands
                 while (list.children.length > 10) {
                     list.removeChild(list.lastChild);
@@ -951,10 +997,10 @@
             showFeedback(text) {
                 const overlay = document.getElementById('feedbackOverlay');
                 const feedbackText = document.getElementById('feedbackText');
-                
+
                 feedbackText.textContent = text;
                 overlay.classList.add('show');
-                
+
                 setTimeout(() => {
                     overlay.classList.remove('show');
                 }, 2000);
@@ -1004,4 +1050,5 @@
         }
     </script>
 </body>
+
 </html>
