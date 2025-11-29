@@ -301,7 +301,9 @@ def main():
     last_finger_count = None
     last_action = None
     last_action_time = 0
+    mode_lock_time = 0  # Time when mode was locked
     action_cooldown = 0.5  # Seconds between action commands
+    mode_timeout = 2.0  # Seconds before resetting to mode selection
     
     # Main loop
     try:
@@ -322,6 +324,7 @@ def main():
                                 mode = mode_detector.finger_count_to_mode(finger_count)
                                 mode_locked = True
                                 locked_mode = mode
+                                mode_lock_time = time.time()
                                 print(f"\n[MODE LOCKED] {mode}")
                                 print("[READY] Waiting for action gesture...")
                                 mode_lock_frames = 0
@@ -335,11 +338,23 @@ def main():
                         last_finger_count = None
             else:
                 # ACTION DETECTION PHASE
+                current_time = time.time()
+                
+                # Check for timeout - reset to mode selection after 2 seconds
+                if (current_time - mode_lock_time) >= mode_timeout:
+                    print(f"\n[TIMEOUT] Resetting to mode selection...")
+                    mode_locked = False
+                    locked_mode = None
+                    last_action = None
+                    mode_lock_frames = 0
+                    last_finger_count = None
+                    print("[READY] Hold up 1-4 fingers to select mode...")
+                    continue
+                
                 action = recognizer.get_action_gesture()
                 
                 if action is not None:
                     # Only process if action changed and cooldown passed
-                    current_time = time.time()
                     if action != last_action and (current_time - last_action_time) >= action_cooldown:
                         print(f"[ACTION] {action}")
                         
@@ -359,6 +374,8 @@ def main():
                             if mqtt_publisher.publish_command(command_data):
                                 print(f"[MQTT] Published: {locked_mode} -> {cmd_action} = {cmd_value}")
                                 last_action_time = current_time
+                                # Reset timeout timer when action is detected
+                                mode_lock_time = current_time
                         else:
                             print(f"[WARN] Invalid action '{action}' for mode '{locked_mode}'")
                         
