@@ -160,6 +160,44 @@ class ModeDetector:
         """Convert finger count (1-4) to mode name"""
         return self.MODE_MAP.get(finger_count)
 
+class CommandMapper:
+    """Maps mode + action to MQTT command"""
+    
+    def map_to_command(self, mode, action):
+        """
+        Map mode and action to command value.
+        Returns: (action_name, value) or (None, None) if invalid combination
+        """
+        if mode == "TEMPERATURE":
+            if action == "POINT_RIGHT":
+                return ("TEMPERATURE", "UP")
+            elif action == "POINT_LEFT":
+                return ("TEMPERATURE", "DOWN")
+        
+        elif mode == "LIGHTS":
+            if action == "OPEN_HAND":
+                return ("LIGHTS", "ON")
+            elif action == "FIST":
+                return ("LIGHTS", "OFF")
+            elif action == "POINT_RIGHT":
+                return ("LIGHTS", "BRIGHT")
+            elif action == "POINT_LEFT":
+                return ("LIGHTS", "DIM")
+        
+        elif mode == "BLINDS":
+            if action == "OPEN_HAND":
+                return ("BLINDS", "OPEN")
+            elif action == "FIST":
+                return ("BLINDS", "CLOSE")
+        
+        elif mode == "DOOR":
+            if action == "OPEN_HAND":
+                return ("DOOR", "UNLOCK")
+            elif action == "FIST":
+                return ("DOOR", "LOCK")
+        
+        return (None, None)
+
 class GestureMQTTPublisher:
     """Publishes gesture commands to MQTT"""
     
@@ -227,9 +265,18 @@ def main():
     # Initialize components
     recognizer = GestureRecognizer() 
     mode_detector = ModeDetector()
+    command_mapper = CommandMapper()
+    mqtt_publisher = GestureMQTTPublisher()
     
     print("=" * 60)
-    print("  Gesture Controller - Mode & Action Detection")
+    print("  Gesture Controller - MQTT Publisher")
+    print("=" * 60)
+    
+    # Setup MQTT
+    if not mqtt_publisher.setup_mqtt():
+        print("[FAIL] Failed to setup MQTT. Exiting.")
+        return
+    
     print("=" * 60)
     print("STEP 1: Hold up 1-4 fingers to select mode:")
     print("  1 Finger -> Temperature Mode")
@@ -253,6 +300,8 @@ def main():
     mode_lock_threshold = 5  # Need 5 consecutive frames to lock mode
     last_finger_count = None
     last_action = None
+    last_action_time = 0
+    action_cooldown = 0.5  # Seconds between action commands
     
     # Main loop
     try:
@@ -289,9 +338,30 @@ def main():
                 action = recognizer.get_action_gesture()
                 
                 if action is not None:
-                    # Only print if action changed
-                    if action != last_action:
+                    # Only process if action changed and cooldown passed
+                    current_time = time.time()
+                    if action != last_action and (current_time - last_action_time) >= action_cooldown:
                         print(f"[ACTION] {action}")
+                        
+                        # Map action to command
+                        cmd_action, cmd_value = command_mapper.map_to_command(locked_mode, action)
+                        
+                        if cmd_action and cmd_value:
+                            # Create command payload
+                            command_data = {
+                                "category": locked_mode,
+                                "action": cmd_action,
+                                "value": cmd_value,
+                                "timestamp": time.strftime('%H:%M:%S')
+                            }
+                            
+                            # Publish to MQTT
+                            if mqtt_publisher.publish_command(command_data):
+                                print(f"[MQTT] Published: {locked_mode} -> {cmd_action} = {cmd_value}")
+                                last_action_time = current_time
+                        else:
+                            print(f"[WARN] Invalid action '{action}' for mode '{locked_mode}'")
+                        
                         last_action = action
                 else:
                     # No action detected, reset last action
@@ -304,7 +374,9 @@ def main():
         print("\n\nStopping...")
     finally:
         recognizer.close()
+        mqtt_publisher.cleanup()
         print("[OK] Camera released")
+        print("[OK] MQTT client disconnected")
 
 if __name__ == "__main__":
     try:
