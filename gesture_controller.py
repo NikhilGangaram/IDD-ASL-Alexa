@@ -47,7 +47,7 @@ class GestureRecognizer:
         self.last_gesture = None
         self.gesture_buffer = deque(maxlen=5)  # For smoothing
 
-    def get_gesture(self):
+    def get_gesture(self, mode_locked=False):
         # Always use camera (no mock check)
         success, img = self.cap.read()
         if not success:
@@ -60,14 +60,18 @@ class GestureRecognizer:
         
         if results.multi_hand_landmarks:
             for hand_lms in results.multi_hand_landmarks:
-                # No drawing needed for headless operation
-                gesture = self._analyze_hand(hand_lms)
+                # Pass mode_locked flag to separate mode vs action gestures
+                gesture = self._analyze_hand(hand_lms, mode_locked)
         
         # No display code here (fully headless)
         
         return gesture
 
-    def _analyze_hand(self, landmarks):
+    def _analyze_hand(self, landmarks, mode_locked=False):
+        """
+        Analyze hand gesture.
+        mode_locked: If True, only detect action gestures. If False, only detect mode selection gestures.
+        """
         lms = landmarks.landmark
         
         # Check which fingers are open (more lenient thresholds)
@@ -84,61 +88,78 @@ class GestureRecognizer:
         
         total_fingers = sum(fingers)
         
-        # Thumb check for "Open Hand" - more lenient
+        # Thumb check
         thumb_extended = False
-        # Check distance from thumb tip to wrist (landmark 0) or pinky knuckle
         thumb_to_wrist = math.hypot(lms[4].x - lms[0].x, lms[4].y - lms[0].y)
         thumb_to_pinky = math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y)
-        # Thumb is extended if it's far from wrist/pinky (lowered threshold)
         if thumb_to_wrist > 0.15 or thumb_to_pinky > 0.15:
             thumb_extended = True
 
-        # Gesture Logic - prioritize action gestures when they're clear
+        # MODE SELECTION PHASE: Only detect mode gestures (1-4 fingers held up)
+        if not mode_locked:
+            # Mode gestures: fingers held up vertically (not pointing)
+            # Check if hand is oriented vertically for mode selection
+            wrist_y = lms[0].y
+            middle_finger_tip_y = lms[12].y
+            
+            # For mode selection, hand should be held up (wrist lower than fingers)
+            # More lenient: allow some variation in hand orientation
+            hand_held_up = wrist_y > middle_finger_tip_y - 0.05
+            
+            if hand_held_up:
+                if total_fingers == 1 and not thumb_extended:
+                    return "ONE_FINGER"
+                if total_fingers == 2 and not thumb_extended:
+                    return "TWO_FINGERS"
+                if total_fingers == 3 and not thumb_extended:
+                    return "THREE_FINGERS"
+                if total_fingers == 4 and not thumb_extended:
+                    return "FOUR_FINGERS"
+            
+            # If hand not held up, return unknown (not a mode gesture)
+            return "UNKNOWN"
         
-        # Open Hand (5 fingers extended) - check first before mode gestures
+        # ACTION PHASE: Only detect action gestures (pointing, fist, open hand)
+        # Open Hand (all 5 fingers extended)
         if total_fingers == 4 and thumb_extended:
-            return "OPEN_HAND"
-        
-        # Check for all 5 fingers extended (more reliable open hand detection)
-        if total_fingers == 4:
-            # Additional check: are all finger tips well above their joints?
+            # Verify all fingers are extended
             all_extended = all([
                 lms[8].y < lms[6].y - 0.03,   # Index
                 lms[12].y < lms[10].y - 0.03, # Middle
                 lms[16].y < lms[14].y - 0.03, # Ring
                 lms[20].y < lms[18].y - 0.03  # Pinky
             ])
-            if all_extended and thumb_extended:
+            if all_extended:
                 return "OPEN_HAND"
-            
-        # Fist (0 fingers) - check early
+        
+        # Fist (0 fingers extended, thumb not extended)
         if total_fingers == 0 and not thumb_extended:
             return "FIST"
         
-        # Pointing gestures - improved detection with lower threshold
+        # Pointing gestures - detect by hand orientation and finger position
         if total_fingers == 1 and not thumb_extended:
-            # Check x direction of index finger with more lenient threshold
-            index_tip_x = lms[8].x
-            index_mcp_x = lms[5].x  # Use MCP joint for more stable reference
-            index_delta = index_tip_x - index_mcp_x
+            # Check if index finger is extended and pointing horizontally
+            index_tip = (lms[8].x, lms[8].y)
+            index_mcp = (lms[5].x, lms[5].y)
+            wrist = (lms[0].x, lms[0].y)
             
-            # Lower threshold for easier activation (was 0.05, now 0.03)
-            if index_delta > 0.03:  # Pointing Left (from camera view)
-                return "POINT_LEFT"
-            if index_delta < -0.03:  # Pointing Right
-                return "POINT_RIGHT"
-            # If pointing but not clearly left/right, still return pointing gesture
-            return "ONE_FINGER"
-        
-        # Mode Selection Gestures (only if not already detected as action gestures)
-        if total_fingers == 1 and not thumb_extended:
-            return "ONE_FINGER"
-        if total_fingers == 2 and not thumb_extended:
-            return "TWO_FINGERS"
-        if total_fingers == 3 and not thumb_extended:
-            return "THREE_FINGERS"
-        if total_fingers == 4 and not thumb_extended:
-            return "FOUR_FINGERS"
+            # Calculate direction vector of index finger
+            index_delta_x = index_tip[0] - index_mcp[0]
+            index_delta_y = index_tip[1] - index_mcp[1]
+            
+            # For pointing, finger should be extended horizontally (small y difference)
+            # and have significant x movement
+            is_horizontal = abs(index_delta_y) < 0.1
+            
+            if is_horizontal:
+                # Check pointing direction
+                if index_delta_x > 0.03:  # Pointing Left (from camera view)
+                    return "POINT_LEFT"
+                if index_delta_x < -0.03:  # Pointing Right
+                    return "POINT_RIGHT"
+                # Pointing forward/straight
+                if abs(index_delta_x) < 0.03:
+                    return "POINT_RIGHT"  # Default to right if unclear
                 
         return "UNKNOWN"
 
@@ -374,7 +395,8 @@ def main():
     # Main loop (Camera only)
     try:
         while True:
-            gesture = recognizer.get_gesture()
+            # Pass mode_locked status to gesture recognizer
+            gesture = recognizer.get_gesture(mode_locked=logic.mode_locked)
             if gesture and gesture != "NONE" and gesture != "UNKNOWN":
                 event_type, data = logic.process_gesture(gesture)
                 
