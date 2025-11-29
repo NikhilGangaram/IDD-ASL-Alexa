@@ -74,25 +74,24 @@ class GestureRecognizer:
         """
         lms = landmarks.landmark
         
-        # Check which fingers are open (more lenient thresholds)
+        # Check which fingers are open
         fingers = []
         
-        # Index - check if tip is above middle joint (with tolerance)
-        fingers.append(1 if lms[8].y < lms[6].y - 0.02 else 0)
+        # Index
+        fingers.append(1 if lms[8].y < lms[6].y else 0)
         # Middle
-        fingers.append(1 if lms[12].y < lms[10].y - 0.02 else 0)
+        fingers.append(1 if lms[12].y < lms[10].y else 0)
         # Ring
-        fingers.append(1 if lms[16].y < lms[14].y - 0.02 else 0)
+        fingers.append(1 if lms[16].y < lms[14].y else 0)
         # Pinky
-        fingers.append(1 if lms[20].y < lms[18].y - 0.02 else 0)
+        fingers.append(1 if lms[20].y < lms[18].y else 0)
         
         total_fingers = sum(fingers)
         
-        # Thumb check
+        # Thumb check for "Open Hand" vs "Point"
         thumb_extended = False
-        thumb_to_wrist = math.hypot(lms[4].x - lms[0].x, lms[4].y - lms[0].y)
-        thumb_to_pinky = math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y)
-        if thumb_to_wrist > 0.15 or thumb_to_pinky > 0.15:
+        # Simple check: distance from tip to pinky knuckle (17) is large
+        if math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y) > 0.2:
             thumb_extended = True
 
         # MODE SELECTION PHASE: Only detect mode gestures (1-4 fingers held up)
@@ -120,46 +119,22 @@ class GestureRecognizer:
             return "UNKNOWN"
         
         # ACTION PHASE: Only detect action gestures (pointing, fist, open hand)
-        # Open Hand (all 5 fingers extended)
+        # Open Hand (5 fingers)
         if total_fingers == 4 and thumb_extended:
-            # Verify all fingers are extended
-            all_extended = all([
-                lms[8].y < lms[6].y - 0.03,   # Index
-                lms[12].y < lms[10].y - 0.03, # Middle
-                lms[16].y < lms[14].y - 0.03, # Ring
-                lms[20].y < lms[18].y - 0.03  # Pinky
-            ])
-            if all_extended:
-                return "OPEN_HAND"
-        
-        # Fist (0 fingers extended, thumb not extended)
+            return "OPEN_HAND"
+            
+        # Fist (0 fingers)
         if total_fingers == 0 and not thumb_extended:
             return "FIST"
-        
-        # Pointing gestures - detect by hand orientation and finger position
-        if total_fingers == 1 and not thumb_extended:
-            # Check if index finger is extended and pointing horizontally
-            index_tip = (lms[8].x, lms[8].y)
-            index_mcp = (lms[5].x, lms[5].y)
-            wrist = (lms[0].x, lms[0].y)
             
-            # Calculate direction vector of index finger
-            index_delta_x = index_tip[0] - index_mcp[0]
-            index_delta_y = index_tip[1] - index_mcp[1]
-            
-            # For pointing, finger should be extended horizontally (small y difference)
-            # and have significant x movement
-            is_horizontal = abs(index_delta_y) < 0.1
-            
-            if is_horizontal:
-                # Check pointing direction
-                if index_delta_x > 0.03:  # Pointing Left (from camera view)
-                    return "POINT_LEFT"
-                if index_delta_x < -0.03:  # Pointing Right
-                    return "POINT_RIGHT"
-                # Pointing forward/straight
-                if abs(index_delta_x) < 0.03:
-                    return "POINT_RIGHT"  # Default to right if unclear
+        # Pointing (Index finger only, but check direction)
+        if total_fingers == 1:
+            # Check x direction of index finger
+            # If tip is significantly to the right/left of the knuckle
+            if lms[8].x > lms[6].x + 0.05: # Pointing Left (from camera view, it's user's left)
+                return "POINT_LEFT"
+            if lms[8].x < lms[6].x - 0.05: # Pointing Right
+                return "POINT_RIGHT"
                 
         return "UNKNOWN"
 
