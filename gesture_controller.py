@@ -46,6 +46,7 @@ class GestureRecognizer:
         
         self.last_gesture = None
         self.gesture_buffer = deque(maxlen=5)  # For smoothing
+        self.action_buffer = deque(maxlen=3)  # Buffer for action gestures
 
     def get_finger_count(self):
         """Detect and return the number of fingers held up (0-5)"""
@@ -89,7 +90,9 @@ class GestureRecognizer:
         return total_fingers
     
     def get_action_gesture(self):
-        """Detect action gestures: POINT_LEFT, POINT_RIGHT, OPEN_HAND, FIST"""
+        """Detect action gestures: POINT_LEFT, POINT_RIGHT, OPEN_HAND, FIST
+        Uses buffering to smooth out detection and reduce flickering
+        """
         success, img = self.cap.read()
         if not success:
             return None
@@ -98,6 +101,10 @@ class GestureRecognizer:
         results = self.hands.process(img_rgb) 
         
         if not results.multi_hand_landmarks:
+            self.action_buffer.append(None)
+            # Return most common gesture in buffer if buffer is full
+            if len(self.action_buffer) == self.action_buffer.maxlen:
+                return self._get_most_common_gesture()
             return None
         
         # Process first hand detected
@@ -118,22 +125,80 @@ class GestureRecognizer:
         if math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y) > 0.2:
             thumb_extended = True
         
+        detected_gesture = None
+        
         # Open Hand (5 fingers)
         if total_fingers == 4 and thumb_extended:
-            return "OPEN_HAND"
+            detected_gesture = "OPEN_HAND"
         
         # Fist (0-1 fingers, thumb not extended)
-        if total_fingers <= 1 and not thumb_extended:
-            return "FIST"
+        elif total_fingers <= 1 and not thumb_extended:
+            detected_gesture = "FIST"
         
         # Pointing gestures (index finger extended)
-        if total_fingers == 1 and not thumb_extended:
-            # Check x direction of index finger
-            # If tip is significantly to the right/left of the knuckle
-            if lms[8].x > lms[6].x + 0.05:  # Pointing Left (from camera view)
-                return "POINT_LEFT"
-            if lms[8].x < lms[6].x - 0.05:  # Pointing Right
-                return "POINT_RIGHT"
+        elif total_fingers == 1 and not thumb_extended:
+            # Use multiple reference points for more robust detection
+            index_tip = (lms[8].x, lms[8].y)
+            index_pip = (lms[6].x, lms[6].y)  # Middle joint
+            index_mcp = (lms[5].x, lms[5].y)  # Base knuckle
+            wrist = (lms[0].x, lms[0].y)  # Wrist
+            
+            # Calculate direction vector from base to tip
+            tip_to_mcp_x = index_tip[0] - index_mcp[0]
+            tip_to_mcp_y = index_tip[1] - index_mcp[1]
+            
+            # Calculate direction vector from pip to tip (more stable)
+            tip_to_pip_x = index_tip[0] - index_pip[0]
+            tip_to_pip_y = index_tip[1] - index_pip[1]
+            
+            # Check if finger is extended (tip should be away from base)
+            finger_extended = tip_to_mcp_y < -0.05  # Tip is above base (negative y)
+            
+            if finger_extended:
+                # Use average of both direction vectors for more stability
+                avg_delta_x = (tip_to_mcp_x + tip_to_pip_x) / 2
+                
+                # More lenient threshold - 0.03 instead of 0.05
+                # Also check relative to wrist position for better accuracy
+                wrist_to_tip_x = index_tip[0] - wrist[0]
+                
+                # Combine both measurements
+                combined_x = (avg_delta_x * 0.7) + (wrist_to_tip_x * 0.3)
+                
+                # Pointing Left (from camera view, user's left)
+                if combined_x > 0.03:
+                    detected_gesture = "POINT_LEFT"
+                # Pointing Right
+                elif combined_x < -0.03:
+                    detected_gesture = "POINT_RIGHT"
+                # If pointing forward/straight, default to right
+                elif abs(combined_x) < 0.03:
+                    detected_gesture = "POINT_RIGHT"
+        
+        # Add to buffer
+        self.action_buffer.append(detected_gesture)
+        
+        # Return most common gesture in buffer if buffer is full
+        if len(self.action_buffer) == self.action_buffer.maxlen:
+            return self._get_most_common_gesture()
+        
+        return None
+    
+    def _get_most_common_gesture(self):
+        """Get the most common gesture from the buffer, ignoring None values"""
+        # Filter out None values
+        valid_gestures = [g for g in self.action_buffer if g is not None]
+        
+        if not valid_gestures:
+            return None
+        
+        # Return the most common gesture
+        from collections import Counter
+        gesture_counts = Counter(valid_gestures)
+        most_common = gesture_counts.most_common(1)
+        
+        if most_common:
+            return most_common[0][0]
         
         return None
 
@@ -169,7 +234,11 @@ class CommandMapper:
         Returns: (action_name, value) or (None, None) if invalid combination
         """
         if mode == "TEMPERATURE":
-            if action == "POINT_RIGHT":
+            if action == "OPEN_HAND":
+                return ("TEMPERATURE", "AC_ON")
+            elif action == "FIST":
+                return ("TEMPERATURE", "AC_OFF")
+            elif action == "POINT_RIGHT":
                 return ("TEMPERATURE", "UP")
             elif action == "POINT_LEFT":
                 return ("TEMPERATURE", "DOWN")
@@ -285,10 +354,10 @@ def main():
     print("  4 Fingers -> Door Mode")
     print()
     print("STEP 2: Once mode is locked, use action gestures:")
-    print("  Point Left -> Decrease/Dim")
-    print("  Point Right -> Increase/Brighten")
-    print("  Open Hand (5 fingers) -> On/Open/Unlock")
-    print("  Fist (0-1 fingers) -> Off/Close/Lock")
+    print("  Point Left -> Decrease/Dim/Down")
+    print("  Point Right -> Increase/Brighten/Up")
+    print("  Open Hand (5 fingers) -> On/Open/Unlock/AC On")
+    print("  Fist (0-1 fingers) -> Off/Close/Lock/AC Off")
     print("=" * 60)
     print("Press Ctrl+C to exit")
     print()
