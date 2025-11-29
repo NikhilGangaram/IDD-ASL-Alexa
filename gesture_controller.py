@@ -372,7 +372,7 @@ def main():
     last_action_time = 0
     mode_lock_time = 0  # Time when mode was locked
     action_cooldown = 0.5  # Seconds between action commands
-    mode_timeout = 2.0  # Seconds before resetting to mode selection
+    mode_timeout = 5.0  # Seconds before resetting to mode selection
     
     # Main loop
     try:
