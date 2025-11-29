@@ -87,6 +87,55 @@ class GestureRecognizer:
             total_fingers += 1
         
         return total_fingers
+    
+    def get_action_gesture(self):
+        """Detect action gestures: POINT_LEFT, POINT_RIGHT, OPEN_HAND, FIST"""
+        success, img = self.cap.read()
+        if not success:
+            return None
+
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = self.hands.process(img_rgb) 
+        
+        if not results.multi_hand_landmarks:
+            return None
+        
+        # Process first hand detected
+        hand_lms = results.multi_hand_landmarks[0]
+        lms = hand_lms.landmark
+        
+        # Check which fingers are open
+        fingers = []
+        fingers.append(1 if lms[8].y < lms[6].y else 0)   # Index
+        fingers.append(1 if lms[12].y < lms[10].y else 0) # Middle
+        fingers.append(1 if lms[16].y < lms[14].y else 0) # Ring
+        fingers.append(1 if lms[20].y < lms[18].y else 0) # Pinky
+        
+        total_fingers = sum(fingers)
+        
+        # Check thumb
+        thumb_extended = False
+        if math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y) > 0.2:
+            thumb_extended = True
+        
+        # Open Hand (5 fingers)
+        if total_fingers == 4 and thumb_extended:
+            return "OPEN_HAND"
+        
+        # Fist (0-1 fingers, thumb not extended)
+        if total_fingers <= 1 and not thumb_extended:
+            return "FIST"
+        
+        # Pointing gestures (index finger extended)
+        if total_fingers == 1 and not thumb_extended:
+            # Check x direction of index finger
+            # If tip is significantly to the right/left of the knuckle
+            if lms[8].x > lms[6].x + 0.05:  # Pointing Left (from camera view)
+                return "POINT_LEFT"
+            if lms[8].x < lms[6].x - 0.05:  # Pointing Right
+                return "POINT_RIGHT"
+        
+        return None
 
     # Removed _get_mock_input
     
@@ -180,40 +229,76 @@ def main():
     mode_detector = ModeDetector()
     
     print("=" * 60)
-    print("  Gesture Controller - Mode Detection Test")
+    print("  Gesture Controller - Mode & Action Detection")
     print("=" * 60)
-    print("Hold up 1-4 fingers to select mode:")
+    print("STEP 1: Hold up 1-4 fingers to select mode:")
     print("  1 Finger -> Temperature Mode")
     print("  2 Fingers -> Lights Mode")
     print("  3 Fingers -> Blinds Mode")
     print("  4 Fingers -> Door Mode")
+    print()
+    print("STEP 2: Once mode is locked, use action gestures:")
+    print("  Point Left -> Decrease/Dim")
+    print("  Point Right -> Increase/Brighten")
+    print("  Open Hand (5 fingers) -> On/Open/Unlock")
+    print("  Fist (0-1 fingers) -> Off/Close/Lock")
     print("=" * 60)
     print("Press Ctrl+C to exit")
     print()
     
-    last_mode = None
+    # State variables
+    mode_locked = False
+    locked_mode = None
+    mode_lock_frames = 0
+    mode_lock_threshold = 5  # Need 5 consecutive frames to lock mode
+    last_finger_count = None
+    last_action = None
     
-    # Main loop - just detect and print mode
+    # Main loop
     try:
         while True:
-            finger_count = recognizer.get_finger_count()
-            
-            if finger_count is not None:
-                # Only process mode gestures (1-4 fingers)
-                if 1 <= finger_count <= 4:
-                    mode = mode_detector.finger_count_to_mode(finger_count)
-                    
-                    # Only print if mode changed
-                    if mode != last_mode:
-                        print(f"[MODE] {mode} (Detected {finger_count} finger{'s' if finger_count > 1 else ''})")
-                        last_mode = mode
+            if not mode_locked:
+                # MODE SELECTION PHASE
+                finger_count = recognizer.get_finger_count()
+                
+                if finger_count is not None:
+                    # Check if valid mode gesture (1-4 fingers)
+                    if 1 <= finger_count <= 4:
+                        # If same finger count as last frame, increment counter
+                        if finger_count == last_finger_count:
+                            mode_lock_frames += 1
+                            
+                            # Lock mode if held for enough frames
+                            if mode_lock_frames >= mode_lock_threshold:
+                                mode = mode_detector.finger_count_to_mode(finger_count)
+                                mode_locked = True
+                                locked_mode = mode
+                                print(f"\n[MODE LOCKED] {mode}")
+                                print("[READY] Waiting for action gesture...")
+                                mode_lock_frames = 0
+                        else:
+                            # Different finger count, reset counter
+                            mode_lock_frames = 0
+                            last_finger_count = finger_count
+                    else:
+                        # Invalid finger count, reset
+                        mode_lock_frames = 0
+                        last_finger_count = None
+            else:
+                # ACTION DETECTION PHASE
+                action = recognizer.get_action_gesture()
+                
+                if action is not None:
+                    # Only print if action changed
+                    if action != last_action:
+                        print(f"[ACTION] {action}")
+                        last_action = action
                 else:
-                    # Reset if finger count is not 1-4
-                    if last_mode is not None:
-                        print("[MODE] None (Waiting for mode selection...)")
-                        last_mode = None
+                    # No action detected, reset last action
+                    if last_action is not None:
+                        last_action = None
             
-            time.sleep(0.1) # Check every 100ms
+            time.sleep(0.05) # Check every 50ms
             
     except KeyboardInterrupt:
         print("\n\nStopping...")
