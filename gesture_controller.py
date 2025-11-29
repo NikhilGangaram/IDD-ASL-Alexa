@@ -9,11 +9,13 @@ import math
 from collections import deque
 
 try:
+    # We keep MediaPipe import as it is necessary for the core functionality
     import mediapipe as mp
     MEDIAPIPE_AVAILABLE = True
 except ImportError:
-    MEDIAPIPE_AVAILABLE = False
-    print("Warning: MediaPipe not found. Only Mock Mode will be available.")
+    # If MediaPipe isn't available, we cannot proceed, as mock mode is removed.
+    print("Error: MediaPipe is required but not installed. Exiting.")
+    sys.exit(1)
 
 # Constants
 WEBSOCKET_PORT = 8765
@@ -21,72 +23,57 @@ CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 
 class GestureRecognizer:
-    def __init__(self, mock_mode=False):
-        self.mock_mode = mock_mode
+    # Simplified __init__ - no arguments needed
+    def __init__(self):
+        # Camera mode is the only mode
         
-        if not self.mock_mode and not MEDIAPIPE_AVAILABLE:
-            print("Error: MediaPipe is required for camera mode but not installed.")
-            print("Switching to Mock Mode automatically.")
-            self.mock_mode = True
+        self.mp_hands = mp.solutions.hands
+        self.hands = self.mp_hands.Hands(
+            static_image_mode=False,
+            max_num_hands=1,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.5
+        )
+        self.mp_draw = mp.solutions.drawing_utils
+        
+        # 0 is usually the default camera index
+        self.cap = cv2.VideoCapture(0) 
+        if not self.cap.isOpened():
+            # Fatal error if camera fails to open
+            raise IOError("Cannot open webcam. Ensure camera module is connected and enabled.")
 
-        if not self.mock_mode:
-            self.mp_hands = mp.solutions.hands
-            self.hands = self.mp_hands.Hands(
-                static_image_mode=False,
-                max_num_hands=1,
-                min_detection_confidence=0.7,
-                min_tracking_confidence=0.5
-            )
-            self.mp_draw = mp.solutions.drawing_utils
-            self.cap = cv2.VideoCapture(0)
-            self.cap.set(3, CAMERA_WIDTH)
-            self.cap.set(4, CAMERA_HEIGHT)
+        self.cap.set(3, CAMERA_WIDTH)
+        self.cap.set(4, CAMERA_HEIGHT)
         
         self.last_gesture = None
         self.gesture_buffer = deque(maxlen=5)  # For smoothing
 
     def get_gesture(self):
-        if self.mock_mode:
-            return self._get_mock_input()
-        
+        # Always use camera (no mock check)
         success, img = self.cap.read()
         if not success:
             return None
 
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = self.hands.process(img_rgb)
+        results = self.hands.process(img_rgb) 
         
         gesture = "NONE"
         
         if results.multi_hand_landmarks:
             for hand_lms in results.multi_hand_landmarks:
-                self.mp_draw.draw_landmarks(img, hand_lms, self.mp_hands.HAND_CONNECTIONS)
+                # No drawing needed for headless operation
                 gesture = self._analyze_hand(hand_lms)
         
-        # Show camera feed with debug info
-        cv2.putText(img, f"Gesture: {gesture}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.imshow("Smart Home Camera", img)
-        cv2.waitKey(1)
+        # No display code here (fully headless)
         
         return gesture
 
     def _analyze_hand(self, landmarks):
-        # Extract key landmarks
-        # Tips: 4 (Thumb), 8 (Index), 12 (Middle), 16 (Ring), 20 (Pinky)
-        # PIPs (Knuckles): 6, 10, 14, 18
-        
         lms = landmarks.landmark
         
         # Check which fingers are open
         fingers = []
         
-        # Thumb (check x coordinate relative to IP joint for simplicity in right hand, 
-        # but for general use, checking if tip is far from palm center is better. 
-        # Here we use a simple heuristic: is tip to the right of the knuckle? 
-        # Assuming right hand facing camera: thumb is left of hand. 
-        # Let's use a simpler distance based approach or y-check for other fingers)
-        
-        # Thumb is tricky, let's stick to 4 other fingers for counting first
         # Index
         fingers.append(1 if lms[8].y < lms[6].y else 0)
         # Middle
@@ -99,7 +86,6 @@ class GestureRecognizer:
         total_fingers = sum(fingers)
         
         # Thumb check for "Open Hand" vs "Point"
-        # If thumb is extended
         thumb_extended = False
         # Simple check: distance from tip to pinky knuckle (17) is large
         if math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y) > 0.2:
@@ -138,17 +124,14 @@ class GestureRecognizer:
                 
         return "UNKNOWN"
 
-    def _get_mock_input(self):
-        # Non-blocking input check is hard in pure python console without curses
-        # We'll rely on the main loop to handle mock input via separate thread or just random for now?
-        # Actually, let's make it interactive in the console if possible, 
-        # but for simplicity in this loop, we might just return None and handle input in the main loop
-        return None
-
+    # Removed _get_mock_input
+    
     def close(self):
-        if not self.mock_mode:
-            self.cap.release()
-            cv2.destroyAllWindows()
+        # No mock check needed
+        self.cap.release()
+        cv2.destroyAllWindows() 
+
+# --- SmartHomeLogic class remains unchanged ---
 
 class SmartHomeLogic:
     def __init__(self):
@@ -207,18 +190,17 @@ class SmartHomeLogic:
             
         return None, None
 
-
+# --- broadcast function remains unchanged ---
 
 async def broadcast(connected_clients, message):
     if connected_clients:
         await asyncio.gather(*[client.send(message) for client in connected_clients])
 
 async def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mock", action="store_true", help="Run in mock mode (keyboard input)")
-    args = parser.parse_args()
-
-    recognizer = GestureRecognizer(mock_mode=args.mock)
+    # Removed all argparse setup and mock checks
+    
+    # Initialize components
+    recognizer = GestureRecognizer() 
     logic = SmartHomeLogic()
     
     connected_clients = set()
@@ -233,7 +215,7 @@ async def main():
     print(f"Starting WebSocket server on port {WEBSOCKET_PORT}...")
     server = await websockets.serve(ws_handler, "localhost", WEBSOCKET_PORT)
 
-    print("System Ready!")
+    print("System Ready! (Running Camera in Headless Mode)")
     print("Controls:")
     print("  1 Finger: Temperature Mode")
     print("  2 Fingers: Lights Mode")
@@ -243,62 +225,25 @@ async def main():
     print("  Fist: Turn Off / Close")
     print("  Point Right: Increase")
     print("  Point Left: Decrease")
-    if args.mock:
-        print("\nMOCK MODE ACTIVE. Type commands in console:")
-        print("  '1', '2', '3', '4' for modes")
-        print("  'o' (open), 'f' (fist), 'r' (right), 'l' (left) for actions")
-
-    # Main loop
-    # Since we need to run the camera loop and the websocket server, 
-    # and input() is blocking, we have to be careful in mock mode.
-    # For simplicity, we'll use a non-blocking loop for camera, 
-    # but for mock mode input, we might need a separate thread or just use async input if possible.
-    # To keep it simple and robust:
     
+    # Main loop (Camera only)
     try:
-        if args.mock:
-            # Simple input loop for mock mode
-            loop = asyncio.get_running_loop()
-            while True:
-                cmd = await loop.run_in_executor(None, input, "Enter Mock Gesture (1-4, o, f, r, l): ")
-                gesture = "UNKNOWN"
-                if cmd == '1': gesture = "ONE_FINGER"
-                elif cmd == '2': gesture = "TWO_FINGERS"
-                elif cmd == '3': gesture = "THREE_FINGERS"
-                elif cmd == '4': gesture = "FOUR_FINGERS"
-                elif cmd == 'o': gesture = "OPEN_HAND"
-                elif cmd == 'f': gesture = "FIST"
-                elif cmd == 'r': gesture = "POINT_RIGHT"
-                elif cmd == 'l': gesture = "POINT_LEFT"
-                
-                print(f"Detected Gesture: {gesture}")
-                
+        while True:
+            gesture = recognizer.get_gesture()
+            if gesture and gesture != "NONE" and gesture != "UNKNOWN":
                 event_type, data = logic.process_gesture(gesture)
                 
                 if event_type == "MODE_CHANGED":
-                    print(f"System: {data}")
+                    # Use sys.stdout.write for smooth, single-line printing without print() overhead
+                    sys.stdout.write(f"\rMode: {logic.mode}             ")
+                    sys.stdout.flush()
                 elif event_type == "COMMAND":
-                    print(f"Action: {data}")
+                    print(f"\nCOMMAND SENT: {data}")
                     msg = json.dumps({"type": "asl_command", "gesture": data})
                     await broadcast(connected_clients, msg)
-                    
-        else:
-            # Camera loop
-            while True:
-                gesture = recognizer.get_gesture()
-                if gesture and gesture != "NONE" and gesture != "UNKNOWN":
-                    # Simple debouncing could be added here
-                    event_type, data = logic.process_gesture(gesture)
-                    
-                    if event_type == "MODE_CHANGED":
-                        print(f"\rMode: {logic.mode}             ", end="")
-                    elif event_type == "COMMAND":
-                        print(f"\nCOMMAND SENT: {data}")
-                        msg = json.dumps({"type": "asl_command", "gesture": data})
-                        await broadcast(connected_clients, msg)
-                
-                await asyncio.sleep(0.05)
-                
+            
+            await asyncio.sleep(0.05) # Loop speed control
+            
     except KeyboardInterrupt:
         print("\nStopping...")
     finally:
