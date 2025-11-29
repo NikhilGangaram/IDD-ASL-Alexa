@@ -47,8 +47,8 @@ class GestureRecognizer:
         self.last_gesture = None
         self.gesture_buffer = deque(maxlen=5)  # For smoothing
 
-    def get_gesture(self, mode_locked=False):
-        # Always use camera (no mock check)
+    def get_finger_count(self):
+        """Detect and return the number of fingers held up (0-5)"""
         success, img = self.cap.read()
         if not success:
             return None
@@ -56,28 +56,17 @@ class GestureRecognizer:
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = self.hands.process(img_rgb) 
         
-        gesture = "NONE"
+        if not results.multi_hand_landmarks:
+            return None
         
-        if results.multi_hand_landmarks:
-            for hand_lms in results.multi_hand_landmarks:
-                # Pass mode_locked flag to separate mode vs action gestures
-                gesture = self._analyze_hand(hand_lms, mode_locked)
-        
-        # No display code here (fully headless)
-        
-        return gesture
-
-    def _analyze_hand(self, landmarks, mode_locked=False):
-        """
-        Analyze hand gesture.
-        mode_locked: If True, only detect action gestures. If False, only detect mode selection gestures.
-        """
-        lms = landmarks.landmark
+        # Process first hand detected
+        hand_lms = results.multi_hand_landmarks[0]
+        lms = hand_lms.landmark
         
         # Check which fingers are open
         fingers = []
         
-        # Index
+        # Index - check if tip is above middle joint
         fingers.append(1 if lms[8].y < lms[6].y else 0)
         # Middle
         fingers.append(1 if lms[12].y < lms[10].y else 0)
@@ -88,46 +77,16 @@ class GestureRecognizer:
         
         total_fingers = sum(fingers)
         
-        # Thumb check for "Open Hand" vs "Point"
+        # Check thumb
         thumb_extended = False
-        # Simple check: distance from tip to pinky knuckle (17) is large
         if math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y) > 0.2:
             thumb_extended = True
-
-        # MODE SELECTION PHASE: Only detect mode gestures (1-4 fingers held up)
-        if not mode_locked:
-            # Mode gestures: simply count fingers (no orientation check needed)
-            if total_fingers == 1 and not thumb_extended:
-                return "ONE_FINGER"
-            if total_fingers == 2 and not thumb_extended:
-                return "TWO_FINGERS"
-            if total_fingers == 3 and not thumb_extended:
-                return "THREE_FINGERS"
-            if total_fingers == 4 and not thumb_extended:
-                return "FOUR_FINGERS"
-            
-            # If not a mode gesture, return unknown
-            return "UNKNOWN"
         
-        # ACTION PHASE: Only detect action gestures (pointing, fist, open hand)
-        # Open Hand (5 fingers)
-        if total_fingers == 4 and thumb_extended:
-            return "OPEN_HAND"
-            
-        # Fist (0 fingers)
-        if total_fingers == 0 and not thumb_extended:
-            return "FIST"
-            
-        # Pointing (Index finger only, but check direction)
-        if total_fingers == 1:
-            # Check x direction of index finger
-            # If tip is significantly to the right/left of the knuckle
-            if lms[8].x > lms[6].x + 0.05: # Pointing Left (from camera view, it's user's left)
-                return "POINT_LEFT"
-            if lms[8].x < lms[6].x - 0.05: # Pointing Right
-                return "POINT_RIGHT"
-                
-        return "UNKNOWN"
+        # If thumb is extended, add it to count
+        if thumb_extended:
+            total_fingers += 1
+        
+        return total_fingers
 
     # Removed _get_mock_input
     
@@ -138,126 +97,19 @@ class GestureRecognizer:
 
 # --- SmartHomeLogic class remains unchanged ---
 
-class SmartHomeLogic:
-    def __init__(self):
-        self.mode = None # 'TEMPERATURE', 'LIGHTS', 'BLINDS', 'DOOR'
-        self.mode_locked = False  # Whether mode is locked in
-        self.last_action_time = 0
-        self.last_mode_time = 0
-        self.cooldown = 0.5 # Seconds between actions (reduced for responsiveness)
-        self.mode_lock_frames = 0  # Count consecutive mode gesture frames
-        self.mode_lock_threshold = 3  # Frames needed to lock mode
-        self.mode_timeout = 5.0  # Seconds before mode resets if no action
-
-    def process_gesture(self, gesture):
-        current_time = time.time()
-        
-        # Check for mode timeout - reset if no action for too long
-        if self.mode_locked and (current_time - self.last_action_time > self.mode_timeout):
-            self.mode_locked = False
-            self.mode = None
-            return "MODE_RESET", {"message": "Mode timeout - select mode again"}
-        
-        # Mode Selection - only process if mode not locked
-        if not self.mode_locked:
-            if gesture == "ONE_FINGER":
-                self.mode_lock_frames += 1
-                if self.mode_lock_frames >= self.mode_lock_threshold:
-                    self.mode = "TEMPERATURE"
-                    self.mode_locked = True
-                    self.mode_lock_frames = 0
-                    self.last_mode_time = current_time
-                    return "MODE_CHANGED", {"category": "TEMPERATURE", "message": "Temperature Mode Selected - Ready for commands"}
-            elif gesture == "TWO_FINGERS":
-                self.mode_lock_frames += 1
-                if self.mode_lock_frames >= self.mode_lock_threshold:
-                    self.mode = "LIGHTS"
-                    self.mode_locked = True
-                    self.mode_lock_frames = 0
-                    self.last_mode_time = current_time
-                    return "MODE_CHANGED", {"category": "LIGHTS", "message": "Lights Mode Selected - Ready for commands"}
-            elif gesture == "THREE_FINGERS":
-                self.mode_lock_frames += 1
-                if self.mode_lock_frames >= self.mode_lock_threshold:
-                    self.mode = "BLINDS"
-                    self.mode_locked = True
-                    self.mode_lock_frames = 0
-                    self.last_mode_time = current_time
-                    return "MODE_CHANGED", {"category": "BLINDS", "message": "Blinds Mode Selected - Ready for commands"}
-            elif gesture == "FOUR_FINGERS":
-                self.mode_lock_frames += 1
-                if self.mode_lock_frames >= self.mode_lock_threshold:
-                    self.mode = "DOOR"
-                    self.mode_locked = True
-                    self.mode_lock_frames = 0
-                    self.last_mode_time = current_time
-                    return "MODE_CHANGED", {"category": "DOOR", "message": "Door Mode Selected - Ready for commands"}
-            else:
-                # Reset counter if not a mode gesture
-                self.mode_lock_frames = 0
-            
-            # If mode not locked, don't process actions
-            return None, None
-            
-        # Actions (only process if mode is locked)
-        if current_time - self.last_action_time < self.cooldown:
-            return None, None
-
-        if not self.mode:
-            return None, None
-
-        # Map gestures to actions and values
-        action = None
-        value = None
-
-        if gesture == "OPEN_HAND":
-            if self.mode == "LIGHTS": 
-                action = "LIGHTS"
-                value = "ON"
-            elif self.mode == "BLINDS": 
-                action = "BLINDS"
-                value = "OPEN"
-            elif self.mode == "DOOR": 
-                action = "DOOR"
-                value = "UNLOCK"
-            
-        elif gesture == "FIST":
-            if self.mode == "LIGHTS": 
-                action = "LIGHTS"
-                value = "OFF"
-            elif self.mode == "BLINDS": 
-                action = "BLINDS"
-                value = "CLOSE"
-            elif self.mode == "DOOR": 
-                action = "DOOR"
-                value = "LOCK"
-            
-        elif gesture == "POINT_RIGHT": # Increase / Up
-            if self.mode == "TEMPERATURE": 
-                action = "TEMPERATURE"
-                value = "UP"
-            elif self.mode == "LIGHTS": 
-                action = "LIGHTS"
-                value = "BRIGHT"
-            
-        elif gesture == "POINT_LEFT": # Decrease / Down
-            if self.mode == "TEMPERATURE": 
-                action = "TEMPERATURE"
-                value = "DOWN"
-            elif self.mode == "LIGHTS": 
-                action = "LIGHTS"
-                value = "DIM"
-        
-        if action and value:
-            self.last_action_time = current_time
-            return "COMMAND", {
-                "category": self.mode,
-                "action": action,
-                "value": value,
-                "timestamp": time.strftime('%H:%M:%S')
-            }
-            
-        return None, None
+class ModeDetector:
+    """Simple mode detector - maps finger count to mode"""
+    
+    MODE_MAP = {
+        1: "TEMPERATURE",
+        2: "LIGHTS",
+        3: "BLINDS",
+        4: "DOOR"
+    }
+    
+    def finger_count_to_mode(self, finger_count):
+        """Convert finger count (1-4) to mode name"""
+        return self.MODE_MAP.get(finger_count)
 
 class GestureMQTTPublisher:
     """Publishes gesture commands to MQTT"""
@@ -325,69 +177,49 @@ class GestureMQTTPublisher:
 def main():
     # Initialize components
     recognizer = GestureRecognizer() 
-    logic = SmartHomeLogic()
-    mqtt_publisher = GestureMQTTPublisher()
+    mode_detector = ModeDetector()
     
     print("=" * 60)
-    print("  Gesture Controller - MQTT Publisher")
+    print("  Gesture Controller - Mode Detection Test")
     print("=" * 60)
-    
-    # Setup MQTT
-    if not mqtt_publisher.setup_mqtt():
-        print("[FAIL] Failed to setup MQTT. Exiting.")
-        return
-    
-    print("=" * 60)
-    print("System Ready! (Running Camera in Headless Mode)")
-    print("=" * 60)
-    print("HOW TO USE:")
-    print("  1. Hold up fingers to select mode:")
-    print("     - 1 Finger -> Temperature Mode")
-    print("     - 2 Fingers -> Lights Mode")
-    print("     - 3 Fingers -> Blinds Mode")
-    print("     - 4 Fingers -> Door Mode")
-    print("  2. Once mode is selected, use action gestures:")
-    print("     - Open Hand -> Turn On / Open / Unlock")
-    print("     - Fist -> Turn Off / Close / Lock")
-    print("     - Point Right -> Increase / Brighten")
-    print("     - Point Left -> Decrease / Dim")
-    print("  3. Mode auto-resets after 5 seconds of inactivity")
+    print("Hold up 1-4 fingers to select mode:")
+    print("  1 Finger -> Temperature Mode")
+    print("  2 Fingers -> Lights Mode")
+    print("  3 Fingers -> Blinds Mode")
+    print("  4 Fingers -> Door Mode")
     print("=" * 60)
     print("Press Ctrl+C to exit")
     print()
-    sys.stdout.write(">>> Select mode (1-4 fingers)...")
-    sys.stdout.flush()
     
-    # Main loop (Camera only)
+    last_mode = None
+    
+    # Main loop - just detect and print mode
     try:
         while True:
-            # Pass mode_locked status to gesture recognizer
-            gesture = recognizer.get_gesture(mode_locked=logic.mode_locked)
-            if gesture and gesture != "NONE" and gesture != "UNKNOWN":
-                event_type, data = logic.process_gesture(gesture)
-                
-                if event_type == "MODE_CHANGED":
-                    print(f"\n[OK] {data.get('message', 'Mode Selected')}")
-                    sys.stdout.write(f"\r>>> Mode: {logic.mode} - Waiting for command...")
-                    sys.stdout.flush()
-                elif event_type == "MODE_RESET":
-                    print(f"\n[RESET] {data.get('message', 'Mode Reset')}")
-                    sys.stdout.write(f"\r>>> Select mode (1-4 fingers)...")
-                    sys.stdout.flush()
-                elif event_type == "COMMAND":
-                    print(f"\n[CMD] Command sent!")
-                    mqtt_publisher.publish_command(data)
-                    sys.stdout.write(f"\r>>> Mode: {logic.mode} - Waiting for command...")
-                    sys.stdout.flush()
+            finger_count = recognizer.get_finger_count()
             
-            time.sleep(0.05) # Loop speed control
+            if finger_count is not None:
+                # Only process mode gestures (1-4 fingers)
+                if 1 <= finger_count <= 4:
+                    mode = mode_detector.finger_count_to_mode(finger_count)
+                    
+                    # Only print if mode changed
+                    if mode != last_mode:
+                        print(f"[MODE] {mode} (Detected {finger_count} finger{'s' if finger_count > 1 else ''})")
+                        last_mode = mode
+                else:
+                    # Reset if finger count is not 1-4
+                    if last_mode is not None:
+                        print("[MODE] None (Waiting for mode selection...)")
+                        last_mode = None
+            
+            time.sleep(0.1) # Check every 100ms
             
     except KeyboardInterrupt:
         print("\n\nStopping...")
     finally:
         recognizer.close()
-        mqtt_publisher.cleanup()
-        print("[OK] MQTT client disconnected")
+        print("[OK] Camera released")
 
 if __name__ == "__main__":
     try:
