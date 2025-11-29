@@ -96,26 +96,17 @@ class GestureRecognizer:
 
         # MODE SELECTION PHASE: Only detect mode gestures (1-4 fingers held up)
         if not mode_locked:
-            # Mode gestures: fingers held up vertically (not pointing)
-            # Check if hand is oriented vertically for mode selection
-            wrist_y = lms[0].y
-            middle_finger_tip_y = lms[12].y
+            # Mode gestures: simply count fingers (no orientation check needed)
+            if total_fingers == 1 and not thumb_extended:
+                return "ONE_FINGER"
+            if total_fingers == 2 and not thumb_extended:
+                return "TWO_FINGERS"
+            if total_fingers == 3 and not thumb_extended:
+                return "THREE_FINGERS"
+            if total_fingers == 4 and not thumb_extended:
+                return "FOUR_FINGERS"
             
-            # For mode selection, hand should be held up (wrist lower than fingers)
-            # More lenient: allow some variation in hand orientation
-            hand_held_up = wrist_y > middle_finger_tip_y - 0.05
-            
-            if hand_held_up:
-                if total_fingers == 1 and not thumb_extended:
-                    return "ONE_FINGER"
-                if total_fingers == 2 and not thumb_extended:
-                    return "TWO_FINGERS"
-                if total_fingers == 3 and not thumb_extended:
-                    return "THREE_FINGERS"
-                if total_fingers == 4 and not thumb_extended:
-                    return "FOUR_FINGERS"
-            
-            # If hand not held up, return unknown (not a mode gesture)
+            # If not a mode gesture, return unknown
             return "UNKNOWN"
         
         # ACTION PHASE: Only detect action gestures (pointing, fist, open hand)
