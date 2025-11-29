@@ -1,12 +1,12 @@
 import cv2
 import time
-import asyncio
-import websockets
 import json
-import argparse
 import sys
 import math
+import uuid
 from collections import deque
+import paho.mqtt.client as mqtt
+from mqtt.config import MQTTConfig
 
 try:
     # We keep MediaPipe import as it is necessary for the core functionality
@@ -18,7 +18,6 @@ except ImportError:
     sys.exit(1)
 
 # Constants
-WEBSOCKET_PORT = 8765
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 
@@ -135,7 +134,7 @@ class GestureRecognizer:
 
 class SmartHomeLogic:
     def __init__(self):
-        self.mode = None # 'TEMPERATURE', 'LIGHTS', 'BLINDS', 'DOOR', 'SECURITY'
+        self.mode = None # 'TEMPERATURE', 'LIGHTS', 'BLINDS', 'DOOR'
         self.last_action_time = 0
         self.cooldown = 1.0 # Seconds between actions
 
@@ -145,86 +144,169 @@ class SmartHomeLogic:
         # Mode Selection
         if gesture == "ONE_FINGER":
             self.mode = "TEMPERATURE"
-            return "MODE_CHANGED", "Temperature Mode Selected"
+            return "MODE_CHANGED", {"category": "TEMPERATURE", "message": "Temperature Mode Selected"}
         elif gesture == "TWO_FINGERS":
             self.mode = "LIGHTS"
-            return "MODE_CHANGED", "Lights Mode Selected"
+            return "MODE_CHANGED", {"category": "LIGHTS", "message": "Lights Mode Selected"}
         elif gesture == "THREE_FINGERS":
             self.mode = "BLINDS"
-            return "MODE_CHANGED", "Blinds Mode Selected"
+            return "MODE_CHANGED", {"category": "BLINDS", "message": "Blinds Mode Selected"}
         elif gesture == "FOUR_FINGERS":
             self.mode = "DOOR"
-            return "MODE_CHANGED", "Door Mode Selected"
+            return "MODE_CHANGED", {"category": "DOOR", "message": "Door Mode Selected"}
             
         # Actions (with cooldown)
         if current_time - self.last_action_time < self.cooldown:
             return None, None
 
         if not self.mode:
-            return None, "Select a mode first (1-3 fingers)"
+            return None, None
 
+        # Map gestures to actions and values
         action = None
-        cmd_key = None
+        value = None
 
         if gesture == "OPEN_HAND":
-            if self.mode == "LIGHTS": cmd_key = "LIGHTS_ON"
-            elif self.mode == "BLINDS": cmd_key = "BLINDS_OPEN"
-            elif self.mode == "DOOR": cmd_key = "DOOR_UNLOCK"
+            if self.mode == "LIGHTS": 
+                action = "LIGHTS"
+                value = "ON"
+            elif self.mode == "BLINDS": 
+                action = "BLINDS"
+                value = "OPEN"
+            elif self.mode == "DOOR": 
+                action = "DOOR"
+                value = "UNLOCK"
             
         elif gesture == "FIST":
-            if self.mode == "LIGHTS": cmd_key = "LIGHTS_OFF"
-            elif self.mode == "BLINDS": cmd_key = "BLINDS_CLOSE"
-            elif self.mode == "DOOR": cmd_key = "DOOR_LOCK"
+            if self.mode == "LIGHTS": 
+                action = "LIGHTS"
+                value = "OFF"
+            elif self.mode == "BLINDS": 
+                action = "BLINDS"
+                value = "CLOSE"
+            elif self.mode == "DOOR": 
+                action = "DOOR"
+                value = "LOCK"
             
         elif gesture == "POINT_RIGHT": # Increase / Up
-            if self.mode == "TEMPERATURE": cmd_key = "TEMPERATURE_UP"
-            elif self.mode == "LIGHTS": cmd_key = "LIGHTS_BRIGHT"
+            if self.mode == "TEMPERATURE": 
+                action = "TEMPERATURE"
+                value = "UP"
+            elif self.mode == "LIGHTS": 
+                action = "LIGHTS"
+                value = "BRIGHT"
             
         elif gesture == "POINT_LEFT": # Decrease / Down
-            if self.mode == "TEMPERATURE": cmd_key = "TEMPERATURE_DOWN"
-            elif self.mode == "LIGHTS": cmd_key = "LIGHTS_DIM"
+            if self.mode == "TEMPERATURE": 
+                action = "TEMPERATURE"
+                value = "DOWN"
+            elif self.mode == "LIGHTS": 
+                action = "LIGHTS"
+                value = "DIM"
             
-        if cmd_key:
+        if action and value:
             self.last_action_time = current_time
-            return "COMMAND", cmd_key
+            return "COMMAND", {
+                "category": self.mode,
+                "action": action,
+                "value": value,
+                "timestamp": time.strftime('%H:%M:%S')
+            }
             
         return None, None
 
-# --- broadcast function remains unchanged ---
-
-async def broadcast(connected_clients, message):
-    if connected_clients:
-        await asyncio.gather(*[client.send(message) for client in connected_clients])
-
-async def main():
-    # Removed all argparse setup and mock checks
+class GestureMQTTPublisher:
+    """Publishes gesture commands to MQTT"""
     
+    def __init__(self):
+        self.mqtt_client = None
+        
+    def on_connect(self, client, userdata, flags, rc):
+        """MQTT connection callback"""
+        if rc == 0:
+            print(f'[OK] MQTT connected to {MQTTConfig.BROKER}:{MQTTConfig.PORT}')
+            print(f'[OK] Publishing to {MQTTConfig.TOPIC}')
+        else:
+            print(f'[FAIL] MQTT connection failed: {rc}')
+    
+    def on_publish(self, client, userdata, mid):
+        """MQTT publish callback"""
+        pass
+    
+    def setup_mqtt(self):
+        """Setup and connect MQTT client"""
+        try:
+            client_id = f"{MQTTConfig.CLIENT_ID_PREFIX}-gesture-{str(uuid.uuid1())}"
+            self.mqtt_client = mqtt.Client(client_id)
+            
+            if MQTTConfig.USERNAME and MQTTConfig.PASSWORD:
+                self.mqtt_client.username_pw_set(MQTTConfig.USERNAME, MQTTConfig.PASSWORD)
+            
+            self.mqtt_client.on_connect = self.on_connect
+            self.mqtt_client.on_publish = self.on_publish
+            
+            self.mqtt_client.connect(MQTTConfig.BROKER, port=MQTTConfig.PORT, keepalive=MQTTConfig.KEEPALIVE)
+            self.mqtt_client.loop_start()
+            
+            time.sleep(1)
+            return True
+        except Exception as e:
+            print(f'[WARN] MQTT setup failed: {e}')
+            return False
+    
+    def publish_command(self, command_data):
+        """Publish gesture command to MQTT"""
+        payload = {
+            'type': 'gesture_command',
+            'category': command_data.get('category'),
+            'action': command_data.get('action'),
+            'value': command_data.get('value'),
+            'timestamp': command_data.get('timestamp')
+        }
+        result = self.mqtt_client.publish(MQTTConfig.TOPIC, json.dumps(payload))
+        
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            print(f"[{command_data.get('timestamp')}] COMMAND: {command_data.get('category')} -> {command_data.get('action')} = {command_data.get('value')}")
+            return True
+        else:
+            print(f"[ERROR] Failed to publish command: rc={result.rc}")
+            return False
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        if self.mqtt_client:
+            self.mqtt_client.loop_stop()
+            self.mqtt_client.disconnect()
+
+def main():
     # Initialize components
     recognizer = GestureRecognizer() 
     logic = SmartHomeLogic()
+    mqtt_publisher = GestureMQTTPublisher()
     
-    connected_clients = set()
-
-    async def ws_handler(websocket):
-        connected_clients.add(websocket)
-        try:
-            await websocket.wait_closed()
-        finally:
-            connected_clients.remove(websocket)
-
-    print(f"Starting WebSocket server on port {WEBSOCKET_PORT}...")
-    server = await websockets.serve(ws_handler, "localhost", WEBSOCKET_PORT)
-
+    print("=" * 60)
+    print("  Gesture Controller - MQTT Publisher")
+    print("=" * 60)
+    
+    # Setup MQTT
+    if not mqtt_publisher.setup_mqtt():
+        print("[FAIL] Failed to setup MQTT. Exiting.")
+        return
+    
+    print("=" * 60)
     print("System Ready! (Running Camera in Headless Mode)")
     print("Controls:")
     print("  1 Finger: Temperature Mode")
     print("  2 Fingers: Lights Mode")
     print("  3 Fingers: Blinds Mode")
     print("  4 Fingers: Door Mode")
-    print("  Open Hand: Turn On / Open")
-    print("  Fist: Turn Off / Close")
-    print("  Point Right: Increase")
-    print("  Point Left: Decrease")
+    print("  Open Hand: Turn On / Open / Unlock")
+    print("  Fist: Turn Off / Close / Lock")
+    print("  Point Right: Increase / Brighten")
+    print("  Point Left: Decrease / Dim")
+    print("=" * 60)
+    print("Press Ctrl+C to exit")
+    print()
     
     # Main loop (Camera only)
     try:
@@ -238,21 +320,19 @@ async def main():
                     sys.stdout.write(f"\rMode: {logic.mode}             ")
                     sys.stdout.flush()
                 elif event_type == "COMMAND":
-                    print(f"\nCOMMAND SENT: {data}")
-                    msg = json.dumps({"type": "asl_command", "gesture": data})
-                    await broadcast(connected_clients, msg)
+                    mqtt_publisher.publish_command(data)
             
-            await asyncio.sleep(0.05) # Loop speed control
+            time.sleep(0.05) # Loop speed control
             
     except KeyboardInterrupt:
-        print("\nStopping...")
+        print("\n\nStopping...")
     finally:
         recognizer.close()
-        server.close()
-        await server.wait_closed()
+        mqtt_publisher.cleanup()
+        print("[OK] MQTT client disconnected")
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         pass

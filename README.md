@@ -1,205 +1,79 @@
 # IDD-ASL-Alexa
 
-This repository contains two main projects:
-
-1. **ASL Smart Home Dashboard** - A gesture-controlled smart home dashboard
-2. **MQTT Button State Monitor** - An MQTT-based system for monitoring button states
-
----
-
-# ASL Smart Home Dashboard
-
-A gesture-controlled smart home dashboard using Raspberry Pi (or Mac/PC) and a webcam.
-
-## Features
-- **Gesture Control**: Use hand gestures to control lights, temperature, blinds, and doors.
-- **Real-time Dashboard**: Updates instantly via WebSockets.
-- **Mock Mode**: Test without a camera using keyboard input.
-
-## Installation
-
-1.  **Install Python Dependencies**:
-    > [!IMPORTANT]
-    > MediaPipe requires Python 3.8 - 3.11. Python 3.13 is NOT supported.
-    > Please create a virtual environment with a supported version:
-    > `python3.11 -m venv venv`
-    
-    ```bash
-    pip install opencv-python mediapipe websockets asyncio
-    ```
-
-2.  **Hardware**:
-    -   Webcam (Logitech recommended)
-    -   Computer (Mac/PC/Raspberry Pi)
-
-## Usage
-
-### 1. Start the Gesture Controller
-Run the Python script to start the backend server and camera recognition.
-
-**Normal Mode (Camera):**
-```bash
-python gesture_controller.py
-```
-
-**Mock Mode (Keyboard Testing):**
-```bash
-python gesture_controller.py --mock
-```
-
-### 2. Open the Dashboard
-Open `asl-dashboard.html` in your web browser. It will automatically connect to the controller.
-
-## Gestures
-
-### Mode Selection
-Hold up fingers to select a device category:
--   **1 Finger**: Temperature 🌡️
--   **2 Fingers**: Lights 💡
--   **3 Fingers**: Blinds 🪟
--   **4 Fingers**: Door 🚪
-
-### Actions
-Perform gestures to control the selected device:
--   **Open Hand** 🖐️: Turn On / Open / Unlock
--   **Fist** ✊: Turn Off / Close / Lock
--   **Point Right** 👉: Increase / Brighten / Up
--   **Point Left** 👈: Decrease / Dim / Down
-
-## Troubleshooting
--   **Connection Failed**: Ensure `gesture_controller.py` is running.
--   **Camera not working**: Check camera permissions.
--   **Gestures not recognized**: Ensure good lighting and hand is visible.
-
----
-
-# MQTT Button State Monitor
-
-A professional MQTT-based system for monitoring button states from a Raspberry Pi and displaying them in a real-time web dashboard.
-
-## Project Structure
-
-```
-IDD-ASL-Alexa/
-├── mqtt/                    # MQTT package
-│   ├── __init__.py         # Package initialization
-│   ├── config.py           # Configuration settings
-│   ├── publisher.py        # Raspberry Pi button publisher
-│   ├── subscriber.py       # MQTT message subscriber
-│   ├── web_server.py       # Flask web server
-│   └── templates/          # HTML templates
-│       └── dashboard.html   # Web dashboard template
-├── publish.py              # Entry point for publisher (Raspberry Pi)
-├── dashboard.py            # Entry point for web server (Laptop)
-├── requirements.txt        # Python dependencies
-└── README.md              # This file
-```
+A gesture-controlled smart home system that uses hand gestures to control devices via MQTT, with real-time dashboard updates.
 
 ## Features
 
-- **Real-time Updates**: WebSocket-based real-time button state updates
-- **Event-Driven**: Only publishes when button states change
-- **Web Dashboard**: Beautiful, responsive web interface
-- **Activity Feed**: History of button events
-- **MQTT Support**: Works with any MQTT broker
-- **Modular Design**: Clean separation of concerns
+- **Gesture Control**: Use hand gestures to control temperature, lights, blinds, and doors
+- **MQTT Integration**: Commands published as JSON to MQTT broker
+- **Real-time Dashboard**: Web dashboard updates instantly via WebSocket
+- **Camera-based**: Uses MediaPipe for hand gesture recognition
 
-## Installation
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.7+
-- Raspberry Pi with MiniPiTFT (for publisher)
+- Python 3.8 - 3.11 (MediaPipe requirement)
+- Webcam
 - MQTT broker access (default: public HiveMQ broker)
 
-### Setup
+### Installation
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd IDD-ASL-Alexa
-   ```
+```bash
+# Clone repository
+git clone <repository-url>
+cd IDD-ASL-Alexa
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Create virtual environment (recommended)
+python3.11 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-   **Note**: On your laptop, you can skip Raspberry Pi hardware libraries:
-   ```bash
-   pip install "paho-mqtt<2.0" flask flask-socketio
-   ```
+# Install dependencies
+pip install -r requirements.txt
+```
 
-## Usage
+### Run
 
-### On Raspberry Pi (Publisher)
+**Terminal 1 - Start Dashboard:**
+```bash
+python3 dashboard.py
+```
+Open browser to `http://localhost:8080`
 
-Run the button publisher to monitor buttons and publish state changes:
-
+**Terminal 2 - Start Gesture Controller:**
 ```bash
 python3 publish.py
 ```
 
-**What it does:**
-- Connects to MQTT broker (default: `broker.hivemq.com`)
-- Monitors button A (D23) and button B (D24) continuously
-- Publishes button states to topic `IDD/button/state` only when state changes
-- Press Ctrl+C to stop
+## Gestures
 
-### On Laptop (Web Dashboard)
+### Mode Selection (Hold up fingers)
+- **1 Finger** → Temperature 🌡️
+- **2 Fingers** → Lights 💡
+- **3 Fingers** → Blinds 🪟
+- **4 Fingers** → Door 🚪
 
-Run the web dashboard server:
-
-```bash
-python3 dashboard.py
-```
-
-**What it does:**
-- Connects to MQTT broker (default: `broker.hivemq.com`)
-- Subscribes to topic `IDD/button/state`
-- Starts web server on `http://localhost:8080`
-- Serves real-time dashboard showing button states
-- Press Ctrl+C to stop
-
-### Running Both Together
-
-1. **Start the web dashboard on your laptop**:
-   ```bash
-   python3 dashboard.py
-   ```
-   Then open your browser to: `http://localhost:8080`
-
-2. **Start the publisher on Raspberry Pi**:
-   ```bash
-   python3 publish.py
-   ```
-
-3. Press buttons on the Raspberry Pi and watch the state updates appear in real-time on the web dashboard!
+### Actions (After selecting mode)
+- **Open Hand** 🖐️ → Turn On / Open / Unlock
+- **Fist** ✊ → Turn Off / Close / Lock
+- **Point Right** 👉 → Increase / Brighten
+- **Point Left** 👈 → Decrease / Dim
 
 ## Configuration
 
-Configuration is centralized in `mqtt/config.py` and can be overridden with environment variables:
+### MQTT Settings
 
-### MQTT Configuration
-
-```bash
-export MQTT_BROKER='broker.hivemq.com'  # MQTT broker hostname
-export MQTT_PORT='1883'                  # MQTT broker port
-export MQTT_TOPIC='IDD/button/state'     # MQTT topic
-export MQTT_USERNAME=''                  # Optional: MQTT username
-export MQTT_PASSWORD=''                  # Optional: MQTT password
-```
-
-### Web Server Configuration
+Set environment variables or edit `mqtt/config.py`:
 
 ```bash
-export PORT='8080'                       # Web server port (default: 8080)
-export HOST='0.0.0.0'                    # Web server host (default: 0.0.0.0)
+export MQTT_BROKER='broker.hivemq.com'
+export MQTT_PORT='1883'
+export MQTT_TOPIC='IDD/button/state'
+export MQTT_USERNAME=''  # Optional
+export MQTT_PASSWORD=''  # Optional
 ```
 
-### School Network Configuration
-
-To use the school network broker:
+### School Network (Cornell)
 
 ```bash
 export MQTT_BROKER='farlab.infosci.cornell.edu'
@@ -207,70 +81,57 @@ export MQTT_USERNAME='idd'
 export MQTT_PASSWORD='device@theFarm'
 ```
 
-## Architecture
+### Web Server Port
 
-### Components
+```bash
+export PORT='8080'  # Default: 8080
+```
 
-1. **Publisher** (`mqtt/publisher.py`): 
-   - Runs on Raspberry Pi
-   - Monitors GPIO buttons
-   - Publishes state changes to MQTT
+## Project Structure
 
-2. **Subscriber** (`mqtt/subscriber.py`):
-   - Receives MQTT messages
-   - Manages button state
-   - Maintains activity history
+```
+IDD-ASL-Alexa/
+├── gesture_controller.py    # Gesture recognition & MQTT publisher
+├── publish.py                # Entry point for gesture controller
+├── dashboard.py              # Entry point for web dashboard
+├── mqtt/
+│   ├── config.py            # MQTT configuration
+│   ├── publisher.py         # Legacy button publisher
+│   ├── subscriber.py        # MQTT subscriber & state manager
+│   ├── web_server.py        # Flask web server
+│   └── templates/
+│       └── dashboard.html   # Web dashboard UI
+└── requirements.txt         # Python dependencies
+```
 
-3. **Web Server** (`mqtt/web_server.py`):
-   - Flask application
-   - Serves dashboard HTML
-   - WebSocket communication for real-time updates
+## How It Works
 
-4. **Configuration** (`mqtt/config.py`):
-   - Centralized configuration
-   - Environment variable support
-
-## Development
-
-### Project Structure
-
-- **`mqtt/`**: Core MQTT package with modular components
-- **`publish.py`**: Entry point for Raspberry Pi publisher
-- **`dashboard.py`**: Entry point for web dashboard server
-- **`mqtt/templates/`**: HTML templates for web interface
-
-### Adding New Features
-
-1. **New MQTT topics**: Update `mqtt/config.py`
-2. **New buttons**: Update `mqtt/config.py` ButtonConfig
-3. **UI changes**: Edit `mqtt/templates/dashboard.html`
+1. **Gesture Recognition**: Camera captures hand gestures using MediaPipe
+2. **Command Processing**: Gestures mapped to category (temp/lights/blinds/door) and action (on/off/up/down)
+3. **MQTT Publishing**: Commands packaged as JSON and published to MQTT topic
+4. **Dashboard Display**: Web dashboard subscribes to MQTT, receives commands, and updates UI in real-time
 
 ## Troubleshooting
 
-### Port Already in Use
+**Camera not working:**
+- Check camera permissions
+- Ensure camera is not in use by another application
 
-If port 8080 is in use, set a different port:
+**Gestures not recognized:**
+- Ensure good lighting
+- Keep hand visible and well-lit
+- Try adjusting distance from camera
+
+**MQTT connection failed:**
+- Check broker hostname and port
+- Verify network connectivity
+- Check firewall settings
+
+**Port already in use:**
 ```bash
 PORT=8081 python3 dashboard.py
 ```
 
-### MQTT Connection Issues
-
-- Check broker hostname and port
-- Verify network connectivity
-- Check firewall settings
-- Review MQTT broker logs
-
-### Button Not Detected
-
-- Verify GPIO pin configuration in `mqtt/config.py`
-- Check hardware connections
-- Ensure proper permissions for GPIO access
-
 ## License
 
 [Add your license here]
-
-## Contributing
-
-[Add contribution guidelines here]

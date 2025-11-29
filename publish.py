@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Entry point for button publisher (Raspberry Pi)
+Entry point for gesture controller with MQTT publishing
 
-Run this script on the Raspberry Pi to publish button states to MQTT.
+Run this script to start gesture recognition and publish commands to MQTT.
 """
 
-from mqtt.publisher import main
+from gesture_controller import main
 
 if __name__ == '__main__':
     main()

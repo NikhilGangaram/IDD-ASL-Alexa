@@ -31,6 +31,8 @@ def create_app():
         print('[OK] Web client connected')
         # Send current states to newly connected client
         emit('button_states', subscriber.get_states())
+        emit('gesture_states', subscriber.get_gesture_states())
+        emit('current_mode', {'mode': subscriber.get_current_mode()})
         emit('mqtt_status', {
             'connected': subscriber.mqtt_client is not None and subscriber.mqtt_client.is_connected()
         })

@@ -50,6 +50,16 @@
             gap: 0.5rem;
         }
 
+        .current-mode {
+            background: rgba(37, 99, 235, 0.2);
+            border: 2px solid var(--primary);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
         .connection-status {
             display: flex;
             align-items: center;
@@ -116,14 +126,15 @@
             transition: all 0.3s ease;
         }
 
-        .button-card.pressed {
-            border-color: var(--success);
-            box-shadow: 0 0 30px rgba(22, 163, 74, 0.4);
-            background: rgba(22, 163, 74, 0.1);
+        .button-card.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
+            background: rgba(37, 99, 235, 0.1);
         }
 
-        .button-card.released {
-            border-color: var(--border);
+        .button-card.has-value {
+            border-color: var(--success);
+            box-shadow: 0 0 20px rgba(22, 163, 74, 0.3);
         }
 
         .button-label {
@@ -157,14 +168,26 @@
             display: inline-block;
         }
 
-        .button-status-text.pressed {
+        .button-status-text.has-value {
             background: rgba(22, 163, 74, 0.2);
             color: var(--success);
         }
 
-        .button-status-text.released {
+        .button-status-text.no-value {
             background: rgba(163, 163, 163, 0.1);
             color: var(--text-secondary);
+        }
+
+        .category-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            color: var(--success);
+        }
+
+        .category-value.empty {
+            color: var(--text-secondary);
+            font-size: 1.5rem;
         }
 
         .activity-section {
@@ -233,6 +256,11 @@
             color: var(--text-secondary);
         }
 
+        .activity-state.gesture {
+            background: rgba(37, 99, 235, 0.2);
+            color: var(--primary);
+        }
+
         .activity-time {
             color: var(--text-secondary);
             font-size: 0.875rem;
@@ -242,35 +270,56 @@
             .button-grid {
                 grid-template-columns: 1fr;
             }
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
         }
     </style>
 </head>
 <body>
     <header class="header">
         <div class="logo">
-            <span>BUTTON</span>
-            <span>State Dashboard</span>
+            <span>ASL</span>
+            <span>Gesture Control Dashboard</span>
         </div>
-        <div class="connection-status">
-            <span class="status-indicator disconnected" id="statusIndicator"></span>
-            <span id="connectionText">Connecting...</span>
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <div class="current-mode" id="currentMode">
+                Mode: None Selected
+            </div>
+            <div class="connection-status">
+                <span class="status-indicator disconnected" id="statusIndicator"></span>
+                <span id="connectionText">Connecting...</span>
+            </div>
         </div>
     </header>
 
     <div class="main-container">
-        <h1 class="dashboard-title">Raspberry Pi Button States</h1>
+        <h1 class="dashboard-title">Smart Home Gesture Control</h1>
         
         <div class="button-grid">
-            <div class="button-card released" id="buttonACard">
-                <div class="button-label">Button A</div>
-                <div class="button-state released" id="buttonAState">OFF</div>
-                <div class="button-status-text released" id="buttonAStatus">RELEASED</div>
+            <div class="button-card" id="temperatureCard">
+                <div class="button-label">🌡️ Temperature</div>
+                <div class="category-value empty" id="temperatureValue">No Command</div>
+                <div class="button-status-text no-value" id="temperatureStatus">Waiting...</div>
             </div>
 
-            <div class="button-card released" id="buttonBCard">
-                <div class="button-label">Button B</div>
-                <div class="button-state released" id="buttonBState">OFF</div>
-                <div class="button-status-text released" id="buttonBStatus">RELEASED</div>
+            <div class="button-card" id="lightsCard">
+                <div class="button-label">💡 Lights</div>
+                <div class="category-value empty" id="lightsValue">No Command</div>
+                <div class="button-status-text no-value" id="lightsStatus">Waiting...</div>
+            </div>
+
+            <div class="button-card" id="blindsCard">
+                <div class="button-label">🪟 Blinds</div>
+                <div class="category-value empty" id="blindsValue">No Command</div>
+                <div class="button-status-text no-value" id="blindsStatus">Waiting...</div>
+            </div>
+
+            <div class="button-card" id="doorCard">
+                <div class="button-label">🚪 Door</div>
+                <div class="category-value empty" id="doorValue">No Command</div>
+                <div class="button-status-text no-value" id="doorStatus">Waiting...</div>
             </div>
         </div>
 
@@ -279,7 +328,7 @@
             <div class="activity-feed" id="activityFeed">
                 <div class="activity-item">
                     <div>
-                        <div class="activity-button">Waiting for button events...</div>
+                        <div class="activity-button">Waiting for gesture commands...</div>
                     </div>
                 </div>
             </div>
@@ -307,12 +356,39 @@
             }
         });
 
+        socket.on('gesture_command', function(data) {
+            updateGestureState(data.category, data.action, data.value);
+            addGestureActivityItem(data.category, data.action, data.value, data.timestamp);
+        });
+
+        socket.on('current_mode', function(data) {
+            updateCurrentMode(data.mode);
+        });
+
+        socket.on('gesture_states', function(states) {
+            // Update all gesture states
+            if (states.TEMPERATURE) {
+                updateGestureState('TEMPERATURE', 'TEMPERATURE', states.TEMPERATURE);
+            }
+            if (states.LIGHTS) {
+                updateGestureState('LIGHTS', 'LIGHTS', states.LIGHTS);
+            }
+            if (states.BLINDS) {
+                updateGestureState('BLINDS', 'BLINDS', states.BLINDS);
+            }
+            if (states.DOOR) {
+                updateGestureState('DOOR', 'DOOR', states.DOOR);
+            }
+        });
+
         socket.on('button_update', function(data) {
+            // Legacy button support
             updateButtonState(data.button_id, data.state);
             addActivityItem(data.button_id, data.state_str, data.timestamp);
         });
 
         socket.on('button_states', function(states) {
+            // Legacy button support
             updateButtonState('A', states.A);
             updateButtonState('B', states.B);
         });
@@ -321,27 +397,91 @@
             const feed = document.getElementById('activityFeed');
             feed.innerHTML = '';
             history.forEach(function(item) {
-                addActivityItem(item.button_id, item.state, item.timestamp);
+                if (item.type === 'gesture') {
+                    addGestureActivityItem(item.category, item.action, item.value, item.timestamp);
+                } else {
+                    addActivityItem(item.button_id, item.state, item.timestamp);
+                }
             });
         });
 
+        function updateCurrentMode(mode) {
+            const modeElement = document.getElementById('currentMode');
+            if (mode) {
+                modeElement.textContent = `Mode: ${mode}`;
+            } else {
+                modeElement.textContent = 'Mode: None Selected';
+            }
+        }
+
+        function updateGestureState(category, action, value) {
+            const categoryLower = category.toLowerCase();
+            const card = document.getElementById(`${categoryLower}Card`);
+            const valueElement = document.getElementById(`${categoryLower}Value`);
+            const statusElement = document.getElementById(`${categoryLower}Status`);
+
+            if (card && valueElement && statusElement) {
+                // Update value display
+                valueElement.textContent = value;
+                valueElement.className = 'category-value';
+                
+                // Update status
+                statusElement.textContent = `${action}: ${value}`;
+                statusElement.className = 'button-status-text has-value';
+                
+                // Update card styling
+                card.className = 'button-card has-value';
+            }
+        }
+
         function updateButtonState(buttonId, state) {
+            // Legacy button support
             const card = document.getElementById(`button${buttonId}Card`);
             const stateElement = document.getElementById(`button${buttonId}State`);
             const statusElement = document.getElementById(`button${buttonId}Status`);
 
-            if (state) {
-                card.className = 'button-card pressed';
-                stateElement.className = 'button-state pressed';
-                stateElement.textContent = 'ON';
-                statusElement.className = 'button-status-text pressed';
-                statusElement.textContent = 'PRESSED';
-            } else {
-                card.className = 'button-card released';
-                stateElement.className = 'button-state released';
-                stateElement.textContent = 'OFF';
-                statusElement.className = 'button-status-text released';
-                statusElement.textContent = 'RELEASED';
+            if (card && stateElement && statusElement) {
+                if (state) {
+                    card.className = 'button-card pressed';
+                    stateElement.className = 'button-state pressed';
+                    stateElement.textContent = 'ON';
+                    statusElement.className = 'button-status-text pressed';
+                    statusElement.textContent = 'PRESSED';
+                } else {
+                    card.className = 'button-card released';
+                    stateElement.className = 'button-state released';
+                    stateElement.textContent = 'OFF';
+                    statusElement.className = 'button-status-text released';
+                    statusElement.textContent = 'RELEASED';
+                }
+            }
+        }
+
+        function addGestureActivityItem(category, action, value, timestamp) {
+            const feed = document.getElementById('activityFeed');
+            
+            const waitingMsg = feed.querySelector('.activity-item:first-child');
+            if (waitingMsg && waitingMsg.textContent.includes('Waiting')) {
+                waitingMsg.remove();
+            }
+
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            
+            item.innerHTML = `
+                <div>
+                    <div class="activity-button">${category} → ${action}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span class="activity-state gesture">${value}</span>
+                    <span class="activity-time">${timestamp}</span>
+                </div>
+            `;
+
+            feed.insertBefore(item, feed.firstChild);
+
+            while (feed.children.length > 20) {
+                feed.removeChild(feed.lastChild);
             }
         }
 
