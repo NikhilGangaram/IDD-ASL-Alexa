@@ -8,6 +8,17 @@ from collections import deque
 import paho.mqtt.client as mqtt
 from mqtt.config import MQTTConfig
 
+# Optional display dependencies (Adafruit OLED)
+DISPLAY_LIBS_AVAILABLE = False
+try:
+    import board
+    import busio
+    import adafruit_ssd1306
+    from PIL import Image, ImageDraw, ImageFont
+    DISPLAY_LIBS_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Display libraries not available ({e}); proceeding without screen output.")
+
 try:
     # We keep MediaPipe import as it is necessary for the core functionality
     import mediapipe as mp
@@ -20,6 +31,80 @@ except ImportError:
 # Constants
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
+
+class DisplayManager:
+    """Minimal wrapper around the Adafruit OLED to show mode/action text."""
+    def __init__(self):
+        self.available = False
+        self.last_lines = ()
+        
+        if not DISPLAY_LIBS_AVAILABLE:
+            return
+        
+        try:
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.display = adafruit_ssd1306.SSD1306_I2C(128, 32, self.i2c)
+            self.width = self.display.width
+            self.height = self.display.height
+            self.image = Image.new("1", (self.width, self.height))
+            self.draw = ImageDraw.Draw(self.image)
+            try:
+                self.font = ImageFont.truetype("DejaVuSans.ttf", 12)
+            except Exception:
+                self.font = ImageFont.load_default()
+            self.available = True
+            self.clear()
+        except Exception as e:
+            print(f"[WARN] Failed to initialize display: {e}")
+            self.available = False
+    
+    def clear(self):
+        if not self.available:
+            return
+        self.display.fill(0)
+        self.display.show()
+        self.last_lines = ()
+    
+    def _format_line(self, text):
+        return text.replace("_", " ")
+    
+    def show_lines(self, lines):
+        """Render up to two lines on the OLED, skipping duplicate frames."""
+        if not self.available:
+            return
+        
+        # Normalize and deduplicate
+        norm_lines = tuple(self._format_line(line)[:18] for line in lines[:2])
+        if norm_lines == self.last_lines:
+            return
+        self.last_lines = norm_lines
+        
+        self.draw.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
+        y = 0
+        line_height = self.font.getbbox("A")[3] if hasattr(self.font, "getbbox") else self.font.getsize("A")[1]
+        for line in norm_lines:
+            self.draw.text((0, y), line, font=self.font, fill=255)
+            y += line_height
+        self.display.image(self.image)
+        self.display.show()
+    
+    def show_intro(self):
+        self.show_lines(["Gesture Control", "Select 1-4 fingers"])
+    
+    def show_mode_locked(self, mode):
+        if not mode:
+            return
+        self.show_lines([f"Mode: {mode.title()}", "Waiting action..."])
+    
+    def show_action(self, mode, value):
+        if not mode or not value:
+            return
+        mode_line = mode.title()
+        value_line = value.title()
+        self.show_lines([mode_line, value_line])
+    
+    def show_timeout(self):
+        self.show_lines(["Mode timeout", "Select 1-4 fingers"])
 
 class GestureRecognizer:
     # Simplified __init__ - no arguments needed
@@ -336,6 +421,8 @@ def main():
     mode_detector = ModeDetector()
     command_mapper = CommandMapper()
     mqtt_publisher = GestureMQTTPublisher()
+    display = DisplayManager()
+    display.show_intro()
     
     print("=" * 60)
     print("  Gesture Controller - MQTT Publisher")
@@ -396,6 +483,7 @@ def main():
                                 mode_lock_time = time.time()
                                 print(f"\n[MODE LOCKED] {mode}")
                                 print("[READY] Waiting for action gesture...")
+                                display.show_mode_locked(mode)
                                 mode_lock_frames = 0
                         else:
                             # Different finger count, reset counter
@@ -417,6 +505,7 @@ def main():
                     last_action = None
                     mode_lock_frames = 0
                     last_finger_count = None
+                    display.show_timeout()
                     print("[READY] Hold up 1-4 fingers to select mode...")
                     continue
                 
@@ -442,6 +531,7 @@ def main():
                             # Publish to MQTT
                             if mqtt_publisher.publish_command(command_data):
                                 print(f"[MQTT] Published: {locked_mode} -> {cmd_action} = {cmd_value}")
+                                display.show_action(locked_mode, cmd_value)
                                 last_action_time = current_time
                                 # Reset timeout timer when action is detected
                                 mode_lock_time = current_time

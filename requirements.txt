@@ -13,3 +13,5 @@ flask-socketio>=5.0.0
 # Raspberry Pi Hardware Libraries (required only for mqtt_module.py on Raspberry Pi)
 # These can be skipped when installing on a laptop for mqtt_hub.py
 Adafruit-Blinka>=8.67.0
+adafruit-circuitpython-ssd1306
+Pillow
