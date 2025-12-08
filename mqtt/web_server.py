@@ -25,6 +25,12 @@ def create_app():
         """Serve the dashboard HTML"""
         return render_template('dashboard.html')
     
+    @app.route('/3d-room')
+    @app.route('/batman')
+    def batman_room():
+        """Serve the Batman cave 3D visualization"""
+        return render_template('batman_room_3d.html')
+    
     @socketio.on('connect')
     def handle_connect():
         """Handle web client connection"""
@@ -33,6 +39,7 @@ def create_app():
         emit('button_states', subscriber.get_states())
         emit('gesture_states', subscriber.get_gesture_states())
         emit('current_mode', {'mode': subscriber.get_current_mode()})
+        emit('finger_count', {'count': subscriber.get_finger_count()})
         emit('mqtt_status', {
             'connected': subscriber.mqtt_client is not None and subscriber.mqtt_client.is_connected()
         })
@@ -58,6 +65,9 @@ def create_app():
         
         print("=" * 60)
         print(f"  Starting web server on http://localhost:{WebConfig.PORT}")
+        # Use ASCII bullets to avoid locale issues on some terminals
+        print(f"  - Dashboard UI:     http://localhost:{WebConfig.PORT}/")
+        print(f"  - Batman 3D room:   http://localhost:{WebConfig.PORT}/3d-room")
         print("  Press Ctrl+C to exit")
         print("=" * 60)
         print()

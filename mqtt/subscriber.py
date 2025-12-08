@@ -29,6 +29,7 @@ class ButtonSubscriber:
             'BLINDS': None,
             'DOOR': None
         }
+        self.finger_count = None
         self.activity_history = []
         self.max_history = 20
     
@@ -40,6 +41,7 @@ class ButtonSubscriber:
             print(f'[OK] Subscribed to {MQTTConfig.TOPIC}')
             if self.socketio:
                 self.socketio.emit('mqtt_status', {'connected': True})
+                self.socketio.emit('finger_count', {'count': self.finger_count})
         else:
             print(f'[FAIL] MQTT connection failed: {rc}')
             if self.socketio:
@@ -55,6 +57,7 @@ class ButtonSubscriber:
                 category = data.get('category')
                 action = data.get('action')
                 value = data.get('value')
+                finger_count = data.get('finger_count')
                 timestamp = data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
                 
                 if category and action and value:
@@ -73,11 +76,15 @@ class ButtonSubscriber:
                     
                     # Broadcast to web clients if available
                     if self.socketio:
+                        if finger_count is not None:
+                            self.finger_count = finger_count
+                            self.socketio.emit('finger_count', {'count': finger_count})
                         self.socketio.emit('gesture_command', {
                             'category': category,
                             'action': action,
                             'value': value,
-                            'timestamp': timestamp
+                            'timestamp': timestamp,
+                            'finger_count': finger_count
                         })
                         self.socketio.emit('current_mode', {'mode': self.current_mode})
                         self.socketio.emit('gesture_states', self.gesture_states.copy())
@@ -180,6 +187,10 @@ class ButtonSubscriber:
     def get_current_mode(self):
         """Get current mode"""
         return self.current_mode
+    
+    def get_finger_count(self):
+        """Get last detected finger count"""
+        return self.finger_count
     
     def get_history(self):
         """Get activity history"""
