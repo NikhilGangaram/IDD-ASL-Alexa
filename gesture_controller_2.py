@@ -60,7 +60,11 @@ SLIDE_REPEAT_INTERVAL = 0.55  # allow repeated LEFT/RIGHT while held
 # Gesture thresholds
 THUMB_INDEX_PINCH_DIST = 0.045
 POINT_X_THRESH = 0.025
-FINGER_TIP_ABOVE_DELTA = -0.04
+# Require fingers to be farther above the PIP to count as "up" to avoid false positives
+FINGER_TIP_ABOVE_DELTA = -0.06
+# Stricter thumb extension to prevent phantom counts
+THUMB_EXTENDED_X_MIN = 0.035
+THUMB_INDEX_BASE_DIST = 0.08
 
 # Frame pacing
 FRAME_SLEEP = 0.05
@@ -197,7 +201,10 @@ class GestureRecognizer:
 
     def _thumb_is_extended(self, lms):
         # Compare thumb tip to index MCP along x for direction robustness
-        return abs(lms[4].x - lms[3].x) > 0.02 and math.hypot(lms[4].x - lms[5].x, lms[4].y - lms[5].y) > 0.06
+        return (
+            abs(lms[4].x - lms[3].x) > THUMB_EXTENDED_X_MIN
+            and math.hypot(lms[4].x - lms[5].x, lms[4].y - lms[5].y) > THUMB_INDEX_BASE_DIST
+        )
 
     def get_finger_count(self):
         _, hand_lms = self._read_frame_landmarks()
@@ -244,6 +251,9 @@ class GestureRecognizer:
 
         if self._detect_pinch(lms):
             detected = "PINCH"
+        elif total == 1 and thumb_extended and not any(finger_up.values()):
+            # Thumb-up only to switch modes (avoids 2-finger conflict with lights)
+            detected = "MODE_SWITCH"
         elif total >= 4 and thumb_extended:
             detected = "OPEN_HAND"
         elif total <= 1 and not thumb_extended:
@@ -466,6 +476,17 @@ def main():
                         continue
                 else:
                     pinch_start_time = None
+
+                # Explicit mode switch gesture (two fingers up)
+                if action == "MODE_SWITCH":
+                    print("[EXIT] Two-finger switch gesture, returning to mode selection.")
+                    mode_locked = False
+                    locked_mode = None
+                    last_action = None
+                    pinch_start_time = None
+                    display.show_intro()
+                    time.sleep(FRAME_SLEEP)
+                    continue
 
                 if action is not None and action != "PINCH":
                     is_slide = action in {"POINT_LEFT", "POINT_RIGHT"}
