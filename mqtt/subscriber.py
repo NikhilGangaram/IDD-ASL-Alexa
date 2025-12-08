@@ -1,5 +1,5 @@
 """
-MQTT Subscriber - Receives and processes button state messages
+MQTT Subscriber - Receives and processes button state and gesture telemetry messages
 
 Handles MQTT message reception and state management for the web dashboard.
 """
@@ -8,11 +8,11 @@ import paho.mqtt.client as mqtt
 import json
 import uuid
 from datetime import datetime
-from .config import MQTTConfig
+from mqtt.config import MQTTConfig
 
 
 class ButtonSubscriber:
-    """Subscribes to MQTT topic and manages gesture commands and button states"""
+    """Subscribes to MQTT topic and manages gesture commands, telemetry, and button states"""
     
     def __init__(self, socketio=None):
         self.mqtt_client = None
@@ -29,7 +29,12 @@ class ButtonSubscriber:
             'BLINDS': None,
             'DOOR': None
         }
+        # Gesture telemetry state
+        self.mode_phase = "SELECT_MODE"
+        self.locked_mode = None
         self.finger_count = None
+        self.action_gesture = None
+        self.confidence = 0.0
         self.activity_history = []
         self.max_history = 20
     
@@ -41,7 +46,6 @@ class ButtonSubscriber:
             print(f'[OK] Subscribed to {MQTTConfig.TOPIC}')
             if self.socketio:
                 self.socketio.emit('mqtt_status', {'connected': True})
-                self.socketio.emit('finger_count', {'count': self.finger_count})
         else:
             print(f'[FAIL] MQTT connection failed: {rc}')
             if self.socketio:
@@ -52,12 +56,32 @@ class ButtonSubscriber:
         try:
             data = json.loads(msg.payload.decode('UTF-8'))
             
+            # Handle gesture telemetry
+            if data.get('type') == 'gesture_telemetry':
+                self.mode_phase = data.get('mode_phase', 'SELECT_MODE')
+                self.locked_mode = data.get('locked_mode')
+                self.finger_count = data.get('finger_count')
+                self.action_gesture = data.get('action_gesture')
+                self.confidence = data.get('confidence', 0.0)
+                timestamp = data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
+                
+                # Broadcast telemetry to web clients
+                if self.socketio:
+                    self.socketio.emit('gesture_telemetry', {
+                        'mode_phase': self.mode_phase,
+                        'locked_mode': self.locked_mode,
+                        'finger_count': self.finger_count,
+                        'action_gesture': self.action_gesture,
+                        'confidence': self.confidence,
+                        'timestamp': timestamp
+                    })
+                return
+            
             # Handle gesture commands
             if data.get('type') == 'gesture_command':
                 category = data.get('category')
                 action = data.get('action')
                 value = data.get('value')
-                finger_count = data.get('finger_count')
                 timestamp = data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
                 
                 if category and action and value:
@@ -76,15 +100,11 @@ class ButtonSubscriber:
                     
                     # Broadcast to web clients if available
                     if self.socketio:
-                        if finger_count is not None:
-                            self.finger_count = finger_count
-                            self.socketio.emit('finger_count', {'count': finger_count})
                         self.socketio.emit('gesture_command', {
                             'category': category,
                             'action': action,
                             'value': value,
-                            'timestamp': timestamp,
-                            'finger_count': finger_count
+                            'timestamp': timestamp
                         })
                         self.socketio.emit('current_mode', {'mode': self.current_mode})
                         self.socketio.emit('gesture_states', self.gesture_states.copy())
@@ -188,9 +208,15 @@ class ButtonSubscriber:
         """Get current mode"""
         return self.current_mode
     
-    def get_finger_count(self):
-        """Get last detected finger count"""
-        return self.finger_count
+    def get_telemetry(self):
+        """Get current telemetry"""
+        return {
+            'mode_phase': self.mode_phase,
+            'locked_mode': self.locked_mode,
+            'finger_count': self.finger_count,
+            'action_gesture': self.action_gesture,
+            'confidence': self.confidence
+        }
     
     def get_history(self):
         """Get activity history"""
@@ -201,4 +227,3 @@ class ButtonSubscriber:
         if self.mqtt_client:
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
-

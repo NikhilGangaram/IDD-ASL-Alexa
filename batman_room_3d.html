@@ -3,1048 +3,505 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batman Cave - 3D Room Control</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>Batman Smart Home - 3D Room</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-        
-        * {
-            margin: 0;
+        body { 
+            margin: 0; 
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Orbitron', monospace;
-            background: #0c0f14;
+            font-family: 'Arial', sans-serif;
             overflow: hidden;
-            position: relative;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1f3a 100%);
         }
-
+        
         #canvas-container {
             width: 100vw;
             height: 100vh;
+            position: relative;
         }
-
-        /* HUD Overlay */
-        .hud {
-            position: fixed;
+        
+        /* Status Panel */
+        #status-panel {
+            position: absolute;
             top: 20px;
             left: 20px;
-            z-index: 100;
-            background: linear-gradient(135deg, rgba(33, 33, 33, 0.95), rgba(10, 10, 10, 0.95));
-            border: 2px solid #FFC107;
-            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #ffd700;
             padding: 20px;
-            min-width: 300px;
-            box-shadow: 
-                0 0 30px rgba(255, 193, 7, 0.3),
-                inset 0 0 20px rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+            font-size: 14px;
+            min-width: 250px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
         }
-
-        .hud-title {
-            font-size: 1.2rem;
-            font-weight: 900;
-            color: #FFC107;
+        
+        #status-panel h3 {
+            margin-top: 0;
+            color: #ffd700;
+            text-align: center;
             text-transform: uppercase;
             letter-spacing: 2px;
-            margin-bottom: 15px;
-            text-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
         }
-
-        .status-grid {
-            display: grid;
-            gap: 10px;
-        }
-
+        
         .status-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.5);
-            border-left: 3px solid #FFC107;
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(255, 215, 0, 0.1);
             border-radius: 5px;
+            transition: all 0.3s ease;
         }
-
-        .status-label {
-            color: #757575;
-            font-size: 0.9rem;
-            text-transform: uppercase;
+        
+        .status-item.active {
+            background: rgba(255, 215, 0, 0.3);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
         }
-
-        .status-value {
-            color: #FFC107;
-            font-weight: 700;
-            text-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
-        }
-
-        /* Connection Status */
-        .connection-status {
-            position: fixed;
+        
+        /* Finger Count Display */
+        #finger-display {
+            position: absolute;
             top: 20px;
             right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: linear-gradient(135deg, rgba(33, 33, 33, 0.95), rgba(10, 10, 10, 0.95));
-            border: 1px solid #FFC107;
-            border-radius: 25px;
-            padding: 10px 20px;
-            z-index: 100;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #FF5252;
-            box-shadow: 0 0 10px rgba(255, 82, 82, 0.5);
-            animation: pulse 2s infinite;
-        }
-
-        .status-dot.connected {
-            background: #00E676;
-            box-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .status-text {
-            color: #E0E0E0;
-            font-size: 0.9rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* Mode Display */
-        .mode-display {
-            position: fixed;
-            top: 80px; /* below connection status */
-            right: 20px;
-            left: auto;
-            background: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(255, 193, 7, 0.15));
-            border: 2px solid #FFC107;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            padding: 20px;
             border-radius: 10px;
-            padding: 12px 20px;
-            font-size: 1.1rem;
-            font-weight: 900;
-            color: #FFC107;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 12px rgba(255, 193, 7, 0.7);
-            display: block;
-            z-index: 200;
-            animation: modeGlow 1s ease-in-out;
-            max-width: 340px;
-            box-shadow: 0 0 18px rgba(255, 193, 7, 0.22);
+            border: 2px solid #00ff00;
+            font-size: 24px;
+            text-align: center;
+            min-width: 200px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
-
-        @keyframes modeGlow {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        
+        #finger-count {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
         }
-
-        /* Instructions */
-        .instructions {
-            position: fixed;
+        
+        .no-hand {
+            color: #666;
+            font-size: 18px;
+        }
+        
+        /* Dynamic Legend */
+        #legend {
+            position: absolute;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(18, 18, 18, 0.95);
-            border: 1px solid #FFC107;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
             border-radius: 10px;
-            padding: 18px 22px;
-            z-index: 100;
-            color: #e0e0e0;
+            border: 2px solid #ffd700;
+            max-width: 600px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+        
+        #legend h3 {
+            margin-top: 0;
+            color: #ffd700;
             text-align: center;
-            max-width: 1100px;
-            line-height: 1.6;
-            box-shadow: 0 0 24px rgba(255, 193, 7, 0.18);
         }
-
-        .instructions span {
-            color: #FFC107;
-            font-weight: 700;
-        }
-
-        .instructions-list {
-            margin-top: 10px;
-            text-align: left;
-            color: #e0e0e0;
-            font-size: 0.95rem;
+        
+        .legend-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 8px 16px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
         }
-
-        .instructions-list .label {
-            color: #FFC107;
-            font-weight: 800;
+        
+        .legend-item {
+            padding: 8px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 5px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            transition: all 0.3s ease;
         }
-
-        .instructions-sub {
-            margin-top: 8px;
-            font-size: 0.9rem;
-            color: #b0b0b0;
+        
+        .legend-item.highlight {
+            background: rgba(255, 215, 0, 0.4);
+            border-color: #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+            animation: pulse 0.5s ease;
         }
-
-        /* Loading Screen */
-        .loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
-
-        .loading-text {
-            font-size: 1.5rem;
-            color: #FFC107;
+        
+        /* Mode Instructions */
+        #mode-instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: #ffd700;
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #ffd700;
+            font-size: 18px;
+            text-align: center;
+            max-width: 400px;
+            display: none;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -45%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        
+        #mode-instructions h2 {
+            margin-top: 0;
+            color: #ffd700;
             text-transform: uppercase;
             letter-spacing: 3px;
-            animation: loadingPulse 1.5s ease-in-out infinite;
         }
-
-        @keyframes loadingPulse {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
+        
+        .mode-list {
+            text-align: left;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+        
+        .mode-list div {
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 5px;
+        }
+        
+        /* Connection Status */
+        #connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background: #00ff00;
+            color: black;
+        }
+        
+        .disconnected {
+            background: #ff0000;
+            color: white;
         }
     </style>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div class="loading" id="loading">
-        <div class="loading-text">INITIALIZING CAVE...</div>
-    </div>
-
-    <!-- 3D Canvas -->
     <div id="canvas-container"></div>
-
-    <!-- HUD Status Panel -->
-    <div class="hud">
-        <div class="hud-title">Cave Systems</div>
-        <div class="status-grid">
-            <div class="status-item">
-                <span class="status-label">Temperature</span>
-                <span class="status-value" id="tempStatus">72°F</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Lights</span>
-                <span class="status-value" id="lightsStatus">OFF</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Blinds</span>
-                <span class="status-value" id="blindsStatus">OPEN</span>
-            </div>
-            <div class="status-item">
-                <span class="status-label">Security</span>
-                <span class="status-value" id="doorStatus">LOCKED</span>
-            </div>
-        </div>
-    </div>
-
+    
     <!-- Connection Status -->
-    <div class="connection-status">
-        <div class="status-dot" id="connectionDot"></div>
-        <span class="status-text" id="connectionText">OFFLINE</span>
-    </div>
-
-    <!-- Mode + Finger Display -->
-    <div class="mode-display" id="modeDisplay">
-        <div id="modeText">MODE: NONE</div>
-        <div id="fingerText" style="margin-top:4px;font-size:0.95rem;color:#ffe082;">Fingers: --</div>
-    </div>
-
-    <!-- Instructions -->
-    <div class="instructions">
-        <div><span>Mouse:</span> Rotate | <span>Scroll:</span> Zoom | <span>Gestures:</span> Control Room</div>
-        <div class="instructions-list">
-            <div><span class="label">1 Finger</span>: Temperature / AC — Open hand = AC ON | Fist = AC OFF | Point → = warmer | Point ← = cooler</div>
-            <div><span class="label">2 Fingers</span>: Lights — Open hand = ON | Fist = OFF | Point → = brighter | Point ← = dimmer</div>
-            <div><span class="label">3 Fingers</span>: Blinds — Open hand = OPEN | Fist = CLOSE</div>
-            <div><span class="label">4 Fingers</span>: Door — Open hand = UNLOCK/OPEN | Fist = LOCK/CLOSE</div>
+    <div id="connection-status" class="disconnected">DISCONNECTED</div>
+    
+    <!-- Status Panel -->
+    <div id="status-panel">
+        <h3>System Status</h3>
+        <div class="status-item">
+            <strong>Mode Phase:</strong> <span id="mode-phase">SELECT_MODE</span>
         </div>
-        <div class="instructions-sub">Tip: Hold the finger count to set mode, then perform the hand action. Matches the publish.py log mappings for clarity.</div>
+        <div class="status-item">
+            <strong>Locked Mode:</strong> <span id="locked-mode">None</span>
+        </div>
+        <div class="status-item">
+            <strong>Last Action:</strong> <span id="last-action">None</span>
+        </div>
+        <div class="status-item">
+            <strong>Confidence:</strong> <span id="confidence">0%</span>
+        </div>
     </div>
-
+    
+    <!-- Finger Count Display -->
+    <div id="finger-display">
+        <div>Fingers Detected</div>
+        <div id="finger-count" class="no-hand">-</div>
+        <div id="hand-status" class="no-hand">No hand detected</div>
+    </div>
+    
+    <!-- Dynamic Legend -->
+    <div id="legend">
+        <h3>Controls</h3>
+        <div id="legend-content"></div>
+    </div>
+    
+    <!-- Mode Selection Instructions (shown when ready) -->
+    <div id="mode-instructions">
+        <h2>Ready for Input</h2>
+        <p>Hold up 1-4 fingers to select mode:</p>
+        <div class="mode-list">
+            <div>👆 1 Finger → Temperature</div>
+            <div>✌️ 2 Fingers → Lights</div>
+            <div>🤟 3 Fingers → Blinds</div>
+            <div>✋ 4 Fingers → Door</div>
+        </div>
+    </div>
+    
     <script>
-        // Initialize Socket.IO
+        // Socket.IO connection
         const socket = io();
         
-        // Three.js Setup
-        let scene, camera, renderer;
-        let room, lights, door, blinds;
-        let ambientLight, mainLight, spotLight, doorLight, windowLight, sunLight, sunBeam;
-        let acFan, acGlow, acFanSpeed = 0.08;
-        let mouseX = 0, mouseY = 0;
+        // State tracking
+        let currentModePhase = 'SELECT_MODE';
+        let currentLockedMode = null;
+        let lastAction = null;
+        let batmanModel = null;
         
-        // Room State
-        const roomState = {
-            temperature: 72,
-            lights: 'OFF',
-            blinds: 'OPEN',
-            door: 'LOCKED',
-            acOn: false
-        };
-
-        function init() {
-            // Scene Setup
-            scene = new THREE.Scene();
-            scene.fog = new THREE.Fog(0x0c0f14, 12, 55);
+        // Three.js setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffd700, 1);
+        directionalLight.position.set(5, 10, 5);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+        
+        // Batman model (simplified representation)
+        const batmanGeometry = new THREE.ConeGeometry(1, 3, 8);
+        const batmanMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x2c2c2c,
+            emissive: 0x111111,
+            specular: 0xffd700,
+            shininess: 30
+        });
+        batmanModel = new THREE.Mesh(batmanGeometry, batmanMaterial);
+        batmanModel.position.set(0, 0, 0);
+        batmanModel.castShadow = true;
+        scene.add(batmanModel);
+        
+        // Add bat symbol on the model
+        const batSymbolGeometry = new THREE.PlaneGeometry(0.8, 0.4);
+        const batSymbolMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffd700,
+            side: THREE.DoubleSide
+        });
+        const batSymbol = new THREE.Mesh(batSymbolGeometry, batSymbolMaterial);
+        batSymbol.position.set(0, 0.5, 1.01);
+        batmanModel.add(batSymbol);
+        
+        // Floor
+        const floorGeometry = new THREE.PlaneGeometry(20, 20);
+        const floorMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x1a1a1a,
+            side: THREE.DoubleSide
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -1.5;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        
+        // Camera position
+        camera.position.set(0, 2, 8);
+        camera.lookAt(0, 0, 0);
+        
+        // Batman animations/states
+        function setBatmanState(state) {
+            if (!batmanModel) return;
             
-            // Camera Setup
-            camera = new THREE.PerspectiveCamera(
-                75, 
-                window.innerWidth / window.innerHeight, 
-                0.1, 
-                1000
-            );
-            camera.position.set(0, 5, 15);
-            camera.lookAt(0, 0, 0);
-            
-            // Renderer Setup
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.setClearColor(0x0c0f14);
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
-            
-            // Lighting Setup
-            setupLighting();
-            
-            // Create Room
-            createRoom();
-            
-            // Create Furniture and Details
-            createFurniture();
-            
-            // Controls
-            setupControls();
-            
-            // Start Animation
-            animate();
-            
-            // Hide loading screen
-            setTimeout(() => {
-                document.getElementById('loading').style.display = 'none';
-            }, 1500);
-        }
-
-        function setupLighting() {
-            // Ambient Light (brighter so objects are visible even when lights are off)
-            ambientLight = new THREE.AmbientLight(0x2a2a2a, 1.0);
-            scene.add(ambientLight);
-            
-            // Main Room Light (controllable)
-            mainLight = new THREE.PointLight(0xFFC107, 1.8, 32);
-            mainLight.position.set(0, 8, 0);
-            mainLight.castShadow = true;
-            mainLight.shadow.mapSize.width = 2048;
-            mainLight.shadow.mapSize.height = 2048;
-            scene.add(mainLight);
-            
-            // Spot Light for dramatic effect
-            spotLight = new THREE.SpotLight(0xFFC107, 0.9);
-            spotLight.position.set(-8, 10, 8);
-            spotLight.angle = Math.PI / 6;
-            spotLight.penumbra = 0.5;
-            spotLight.castShadow = true;
-            spotLight.target.position.set(0, 0, 0);
-            scene.add(spotLight);
-            scene.add(spotLight.target);
-
-            // Door accent light so the door is always visible
-            doorLight = new THREE.SpotLight(0xFFC107, 1.1, 22, Math.PI / 4, 0.45);
-            doorLight.position.set(12, 9, 2);
-            doorLight.target.position.set(9.5, 3.5, 0);
-            scene.add(doorLight);
-            scene.add(doorLight.target);
-
-            // Window glow to silhouette blinds
-            windowLight = new THREE.PointLight(0x1e88e5, 0.4, 18);
-            windowLight.position.set(-10, 6, 2);
-            scene.add(windowLight);
-
-            // Sunlight beam through blinds
-            sunLight = new THREE.SpotLight(0xffe082, 0.35, 40, Math.PI / 4.5, 0.35);
-            sunLight.position.set(-12, 9, 0);
-            sunLight.target.position.set(0, 3, 0);
-            sunLight.castShadow = true;
-            sunLight.shadow.mapSize.width = 1024;
-            sunLight.shadow.mapSize.height = 1024;
-            scene.add(sunLight);
-            scene.add(sunLight.target);
-
-            // Visible sunbeam mesh for open blinds
-            const beamGeom = new THREE.ConeGeometry(3.5, 12, 32, 1, true);
-            const beamMat = new THREE.MeshPhongMaterial({
-                color: 0xffe082,
-                emissive: 0xffd54f,
-                emissiveIntensity: 0.45,
-                transparent: true,
-                opacity: 0.12,
-                side: THREE.DoubleSide
-            });
-            sunBeam = new THREE.Mesh(beamGeom, beamMat);
-            sunBeam.position.set(-8.5, 5.5, 0);
-            sunBeam.rotation.z = Math.PI / 2.2;
-            sunBeam.rotation.y = Math.PI / 2;
-            sunBeam.visible = false;
-            scene.add(sunBeam);
-            
-            // Computer screens glow
-            const screenLight1 = new THREE.PointLight(0x00E676, 0.5, 5);
-            screenLight1.position.set(5, 2, -7);
-            scene.add(screenLight1);
-            
-            const screenLight2 = new THREE.PointLight(0x2196F3, 0.5, 5);
-            screenLight2.position.set(-5, 2, -7);
-            scene.add(screenLight2);
-        }
-
-        function createRoom() {
-            // Floor
-            const floorGeometry = new THREE.PlaneGeometry(20, 20);
-            const floorMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x0a0a0a,
-                roughness: 0.8,
-                metalness: 0.2
-            });
-            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-            
-            // Add floor pattern
-            const gridHelper = new THREE.GridHelper(20, 20, 0x222222, 0x111111);
-            scene.add(gridHelper);
-            
-            // Walls
-            const wallMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x1a1a1a,
-                side: THREE.DoubleSide
-            });
-            
-            // Back wall
-            const backWall = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 12),
-                wallMaterial
-            );
-            backWall.position.z = -10;
-            backWall.receiveShadow = true;
-            scene.add(backWall);
-            
-            // Left wall
-            const leftWall = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 12),
-                wallMaterial
-            );
-            leftWall.rotation.y = Math.PI / 2;
-            leftWall.position.x = -10;
-            leftWall.receiveShadow = true;
-            scene.add(leftWall);
-            
-            // Right wall with window
-            const rightWall = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 12),
-                wallMaterial
-            );
-            rightWall.rotation.y = -Math.PI / 2;
-            rightWall.position.x = 10;
-            rightWall.receiveShadow = true;
-            scene.add(rightWall);
-            
-            // Ceiling
-            const ceiling = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 20),
-                new THREE.MeshPhongMaterial({ color: 0x0a0a0a })
-            );
-            ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 12;
-            scene.add(ceiling);
-            
-            // Create Door
-            createDoor();
-            
-            // Create Blinds on left wall
-            createWindow();
-
-            // AC unit (visualizes airflow / running state)
-            createACUnit();
-        }
-
-        function createDoor() {
-            const doorGroup = new THREE.Group();
-            
-            // Door frame
-            const frameGeometry = new THREE.BoxGeometry(3.2, 7.2, 0.2);
-            const frameMaterial = new THREE.MeshPhongMaterial({ color: 0x444444, emissive: 0x111111, emissiveIntensity: 0.35 });
-            const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-            frame.position.set(9.85, 3.6, 0);
-            frame.rotation.y = -Math.PI / 2;
-            doorGroup.add(frame);
-            
-            // Door panel
-            const doorGeometry = new THREE.BoxGeometry(3, 7, 0.1);
-            const doorMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x2a2a2a,
-                metalness: 0.5,
-                roughness: 0.7,
-                emissive: 0x111111,
-                emissiveIntensity: 0.3
-            });
-            door = new THREE.Mesh(doorGeometry, doorMaterial);
-            door.position.set(-1.5, 0, 0);
-            door.castShadow = true;
-            
-            // Door handle
-            const handleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.5);
-            const handleMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0xFFC107,
-                metalness: 0.9,
-                roughness: 0.1,
-                emissive: 0xFFC107,
-                emissiveIntensity: 0.2
-            });
-            const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-            handle.rotation.z = Math.PI / 2;
-            handle.position.set(1.2, 0, 0.1);
-            door.add(handle);
-            
-            // Lock indicator
-            const lockGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-            const lockMaterial = new THREE.MeshPhongMaterial({
-                color: 0xFF5252,
-                emissive: 0xFF5252,
-                emissiveIntensity: 0.5
-            });
-            const lock = new THREE.Mesh(lockGeometry, lockMaterial);
-            lock.position.set(1.2, 0.5, 0.1);
-            lock.name = 'lock';
-            door.add(lock);
-            
-            // Position door in doorframe
-            const doorPivot = new THREE.Group();
-            doorPivot.add(door);
-            doorPivot.position.set(9.85, 3.5, 1.5);
-            doorPivot.rotation.y = -Math.PI / 2;
-            doorGroup.add(doorPivot);
-            door.userData = { pivot: doorPivot, locked: true };
-            
-            scene.add(doorGroup);
-        }
-
-        function createWindow() {
-            // Window frame on left wall
-            const windowFrame = new THREE.Group();
-            const frameMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-
-            const frameTop = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 0.2), frameMaterial);
-            frameTop.position.set(0, 7, 0);
-
-            const frameBottom = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 0.2), frameMaterial);
-            frameBottom.position.set(0, 3, 0);
-
-            const frameLeft = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4, 0.2), frameMaterial);
-            frameLeft.position.set(-2, 5, 0);
-
-            const frameRight = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4, 0.2), frameMaterial);
-            frameRight.position.set(2, 5, 0);
-
-            windowFrame.add(frameTop, frameBottom, frameLeft, frameRight);
-            windowFrame.position.set(-9.9, 0, 0);
-            windowFrame.rotation.y = Math.PI / 2;
-            scene.add(windowFrame);
-
-            // Window glass
-            const glassGeometry = new THREE.PlaneGeometry(3.8, 3.8);
-            const glassMaterial = new THREE.MeshPhongMaterial({
-                color: 0x0b1a2e,
-                transparent: true,
-                opacity: 0.45,
-                side: THREE.DoubleSide,
-                emissive: 0x0b1a2e,
-                emissiveIntensity: 0.25
-            });
-            const glass = new THREE.Mesh(glassGeometry, glassMaterial);
-            glass.position.set(-9.85, 5, 0);
-            glass.rotation.y = Math.PI / 2;
-            scene.add(glass);
-
-            // Blinds attached to the window frame
-            blinds = new THREE.Group();
-            blinds.position.set(-9.8, 0, 0);
-            blinds.rotation.y = Math.PI / 2;
-            for (let i = 0; i < 10; i++) {
-                const slat = new THREE.Mesh(
-                    new THREE.BoxGeometry(3.6, 0.35, 0.05),
-                    new THREE.MeshPhongMaterial({ color: 0x2e2e2e, emissive: 0x111111, emissiveIntensity: 0.35 })
-                );
-                slat.position.set(0, 6.8 - i * 0.4, 0);
-                blinds.add(slat);
+            switch(state) {
+                case 'READY':
+                    // Idle/ready animation - gentle rotation
+                    batmanModel.rotation.y = 0;
+                    batmanMaterial.emissive = new THREE.Color(0x001100);
+                    break;
+                case 'POINT_LEFT':
+                    batmanModel.rotation.y = Math.PI / 4;
+                    batmanMaterial.emissive = new THREE.Color(0x110011);
+                    break;
+                case 'POINT_RIGHT':
+                    batmanModel.rotation.y = -Math.PI / 4;
+                    batmanMaterial.emissive = new THREE.Color(0x110011);
+                    break;
+                case 'OPEN_HAND':
+                    batmanModel.scale.set(1.2, 1.2, 1.2);
+                    batmanMaterial.emissive = new THREE.Color(0x002200);
+                    setTimeout(() => batmanModel.scale.set(1, 1, 1), 500);
+                    break;
+                case 'FIST':
+                    batmanModel.scale.set(0.8, 0.8, 0.8);
+                    batmanMaterial.emissive = new THREE.Color(0x220000);
+                    setTimeout(() => batmanModel.scale.set(1, 1, 1), 500);
+                    break;
+                default:
+                    batmanMaterial.emissive = new THREE.Color(0x111111);
             }
-            blinds.visible = false;
-            scene.add(blinds);
         }
-
-        function createTemperatureDisplay() {
-            // Removed floating hologram
-            return;
-        }
-
-        function createACUnit() {
-            const acGroup = new THREE.Group();
-
-            // Main vent box
-            const body = new THREE.Mesh(
-                new THREE.BoxGeometry(2.4, 1.2, 1),
-                new THREE.MeshPhongMaterial({
-                    color: 0x2a2a2a,
-                    emissive: 0x111111,
-                    emissiveIntensity: 0.25
-                })
-            );
-            body.position.set(0, 0, 0);
-            acGroup.add(body);
-
-            // Vent grill
-            const grillMaterial = new THREE.MeshPhongMaterial({ color: 0x444444, emissive: 0x1c1c1c, emissiveIntensity: 0.4 });
-            for (let i = -0.9; i <= 0.9; i += 0.3) {
-                const slat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.05, 0.05), grillMaterial);
-                slat.position.set(0, i * 0.35, 0.51);
-                acGroup.add(slat);
-            }
-
-            // Spinning fan to show airflow
-            const fanGroup = new THREE.Group();
-            const hub = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.12, 0.12, 0.2, 16),
-                new THREE.MeshPhongMaterial({ color: 0xFFC107, emissive: 0xFFC107, emissiveIntensity: 0.6 })
-            );
-            hub.rotation.x = Math.PI / 2;
-            fanGroup.add(hub);
-
-            const bladeMaterial = new THREE.MeshPhongMaterial({ color: 0xFFC107, emissive: 0xFFC107, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 });
-            for (let i = 0; i < 4; i++) {
-                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.8, 0.15), bladeMaterial);
-                blade.position.y = 0.4;
-                blade.rotation.z = (Math.PI / 2) * i;
-                fanGroup.add(blade);
-            }
-
-            fanGroup.position.set(0, 0, 0.55);
-            acFan = fanGroup;
-            acGroup.add(fanGroup);
-
-            // Glow to show power state
-            acGlow = new THREE.PointLight(0x00e676, 0.8, 6);
-            acGlow.position.set(0, 0, 0.8);
-            acGroup.add(acGlow);
-
-            acGroup.position.set(-6, 9.5, -6);
-            acGroup.rotation.y = Math.PI / 4;
-            scene.add(acGroup);
-        }
-
-        function createFurniture() {
-            // Desk
-            const deskGroup = new THREE.Group();
+        
+        // Update legend based on mode
+        function updateLegend(modePhase, lockedMode) {
+            const legendContent = document.getElementById('legend-content');
             
-            // Desk top
-            const deskTop = new THREE.Mesh(
-                new THREE.BoxGeometry(6, 0.2, 2),
-                new THREE.MeshPhongMaterial({ color: 0x1a1a1a })
-            );
-            deskTop.position.y = 3;
-            deskTop.castShadow = true;
-            deskTop.receiveShadow = true;
-            
-            // Desk legs
-            const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0a0a0a });
-            const legGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3);
-            
-            const legs = [];
-            for (let x = -2.5; x <= 2.5; x += 5) {
-                for (let z = -0.8; z <= 0.8; z += 1.6) {
-                    const leg = new THREE.Mesh(legGeometry, legMaterial);
-                    leg.position.set(x, 1.5, z);
-                    legs.push(leg);
+            if (modePhase === 'SELECT_MODE') {
+                legendContent.innerHTML = `
+                    <div class="legend-grid">
+                        <div class="legend-item">👆 1 Finger → Temperature</div>
+                        <div class="legend-item">✌️ 2 Fingers → Lights</div>
+                        <div class="legend-item">🤟 3 Fingers → Blinds</div>
+                        <div class="legend-item">✋ 4 Fingers → Door</div>
+                    </div>
+                `;
+            } else if (modePhase === 'LOCKED_MODE' && lockedMode) {
+                let actions = '';
+                switch(lockedMode) {
+                    case 'TEMPERATURE':
+                        actions = `
+                            <div class="legend-item" data-action="OPEN_HAND">✋ Open Hand → AC ON</div>
+                            <div class="legend-item" data-action="FIST">✊ Fist → AC OFF</div>
+                            <div class="legend-item" data-action="POINT_RIGHT">👉 Point Right → UP</div>
+                            <div class="legend-item" data-action="POINT_LEFT">👈 Point Left → DOWN</div>
+                        `;
+                        break;
+                    case 'LIGHTS':
+                        actions = `
+                            <div class="legend-item" data-action="OPEN_HAND">✋ Open Hand → ON</div>
+                            <div class="legend-item" data-action="FIST">✊ Fist → OFF</div>
+                            <div class="legend-item" data-action="POINT_RIGHT">👉 Point Right → BRIGHT</div>
+                            <div class="legend-item" data-action="POINT_LEFT">👈 Point Left → DIM</div>
+                        `;
+                        break;
+                    case 'BLINDS':
+                        actions = `
+                            <div class="legend-item" data-action="OPEN_HAND">✋ Open Hand → OPEN</div>
+                            <div class="legend-item" data-action="FIST">✊ Fist → CLOSE</div>
+                        `;
+                        break;
+                    case 'DOOR':
+                        actions = `
+                            <div class="legend-item" data-action="OPEN_HAND">✋ Open Hand → UNLOCK</div>
+                            <div class="legend-item" data-action="FIST">✊ Fist → LOCK</div>
+                        `;
+                        break;
                 }
+                legendContent.innerHTML = `<div class="legend-grid">${actions}</div>`;
             }
-            
-            deskGroup.add(deskTop, ...legs);
-            deskGroup.position.set(0, 0, -7);
-            scene.add(deskGroup);
-            
-            // Monitors on desk
-            const monitor1 = createMonitor();
-            monitor1.position.set(-2, 3.2, -7);
-            scene.add(monitor1);
-            
-            const monitor2 = createMonitor();
-            monitor2.position.set(2, 3.2, -7);
-            scene.add(monitor2);
-            
-            // Chair
-            const chair = createChair();
-            chair.position.set(0, 0, -3);
-            scene.add(chair);
-            
-            // Side table with lamp
-            const tableGroup = new THREE.Group();
-            
-            const tableTop = new THREE.Mesh(
-                new THREE.CylinderGeometry(1, 1, 0.1, 32),
-                new THREE.MeshPhongMaterial({ color: 0x1a1a1a })
-            );
-            tableTop.position.y = 2;
-            
-            const tableLeg = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.05, 0.05, 2, 16),
-                new THREE.MeshPhongMaterial({ color: 0x0a0a0a })
-            );
-            tableLeg.position.y = 1;
-            
-            tableGroup.add(tableTop, tableLeg);
-            tableGroup.position.set(7, 0, 5);
-            scene.add(tableGroup);
         }
-
-        function createMonitor() {
-            const monitorGroup = new THREE.Group();
-            
-            // Screen
-            const screen = new THREE.Mesh(
-                new THREE.BoxGeometry(3, 2, 0.1),
-                new THREE.MeshPhongMaterial({ 
-                    color: 0x000000,
-                    emissive: 0x00E676,
-                    emissiveIntensity: 0.1
-                })
-            );
-            
-            // Stand
-            const stand = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.5, 0.5, 0.2, 16),
-                new THREE.MeshPhongMaterial({ color: 0x1a1a1a })
-            );
-            stand.position.y = -1.1;
-            
-            monitorGroup.add(screen, stand);
-            return monitorGroup;
-        }
-
-        function createChair() {
-            const chairGroup = new THREE.Group();
-            
-            // Seat
-            const seat = new THREE.Mesh(
-                new THREE.BoxGeometry(2, 0.2, 2),
-                new THREE.MeshPhongMaterial({ color: 0x1a1a1a })
-            );
-            seat.position.y = 2;
-            
-            // Back
-            const back = new THREE.Mesh(
-                new THREE.BoxGeometry(2, 2, 0.2),
-                new THREE.MeshPhongMaterial({ color: 0x1a1a1a })
-            );
-            back.position.set(0, 3, -0.9);
-            
-            // Legs
-            const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0a0a0a });
-            const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 2);
-            
-            const legs = [];
-            for (let x = -0.8; x <= 0.8; x += 1.6) {
-                for (let z = -0.8; z <= 0.8; z += 1.6) {
-                    const leg = new THREE.Mesh(legGeometry, legMaterial);
-                    leg.position.set(x, 1, z);
-                    legs.push(leg);
+        
+        // Highlight action in legend
+        function highlightAction(action) {
+            const items = document.querySelectorAll('.legend-item');
+            items.forEach(item => {
+                if (item.dataset.action === action) {
+                    item.classList.add('highlight');
+                    setTimeout(() => item.classList.remove('highlight'), 1000);
                 }
+            });
+        }
+        
+        // Socket.IO event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.getElementById('connection-status').className = 'connected';
+            document.getElementById('connection-status').textContent = 'CONNECTED';
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            document.getElementById('connection-status').className = 'disconnected';
+            document.getElementById('connection-status').textContent = 'DISCONNECTED';
+        });
+        
+        socket.on('gesture_telemetry', (data) => {
+            // Update mode phase
+            currentModePhase = data.mode_phase || 'SELECT_MODE';
+            currentLockedMode = data.locked_mode;
+            
+            document.getElementById('mode-phase').textContent = currentModePhase;
+            document.getElementById('locked-mode').textContent = currentLockedMode || 'None';
+            
+            // Update finger count display
+            if (data.finger_count !== null && data.finger_count !== undefined) {
+                document.getElementById('finger-count').textContent = data.finger_count;
+                document.getElementById('finger-count').className = '';
+                document.getElementById('hand-status').textContent = `Stable for ${data.confidence ? Math.round(data.confidence * 5) : 0}/5 frames`;
+                document.getElementById('hand-status').className = '';
+            } else {
+                document.getElementById('finger-count').textContent = '-';
+                document.getElementById('finger-count').className = 'no-hand';
+                document.getElementById('hand-status').textContent = 'No hand detected';
+                document.getElementById('hand-status').className = 'no-hand';
             }
             
-            chairGroup.add(seat, back, ...legs);
-            return chairGroup;
-        }
-
-        function setupControls() {
-            // Mouse movement
-            document.addEventListener('mousemove', onMouseMove, false);
+            // Update confidence
+            const confidencePercent = Math.round((data.confidence || 0) * 100);
+            document.getElementById('confidence').textContent = `${confidencePercent}%`;
             
-            // Scroll zoom
-            document.addEventListener('wheel', onMouseWheel, false);
+            // Update action gesture
+            if (data.action_gesture && currentModePhase === 'LOCKED_MODE') {
+                lastAction = data.action_gesture;
+                document.getElementById('last-action').textContent = data.action_gesture;
+                setBatmanState(data.action_gesture);
+                highlightAction(data.action_gesture);
+            }
             
-            // Window resize
-            window.addEventListener('resize', onWindowResize, false);
-        }
-
-        function onMouseMove(event) {
-            mouseX = (event.clientX - window.innerWidth / 2) / 100;
-            mouseY = (event.clientY - window.innerHeight / 2) / 100;
-        }
-
-        function onMouseWheel(event) {
-            camera.position.z += event.deltaY * 0.01;
-            camera.position.z = Math.max(10, Math.min(25, camera.position.z));
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // Animation Loop
+            // Show/hide mode instructions
+            const instructions = document.getElementById('mode-instructions');
+            if (currentModePhase === 'SELECT_MODE') {
+                instructions.style.display = 'block';
+                setBatmanState('READY');
+            } else {
+                instructions.style.display = 'none';
+            }
+            
+            // Update legend
+            updateLegend(currentModePhase, currentLockedMode);
+        });
+        
+        socket.on('gesture_command', (data) => {
+            console.log('Gesture command:', data);
+            // Visual feedback for commands
+            const statusItems = document.querySelectorAll('.status-item');
+            statusItems.forEach(item => {
+                item.classList.add('active');
+                setTimeout(() => item.classList.remove('active'), 500);
+            });
+        });
+        
+        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
             
-            // Camera smooth follow mouse
-            camera.position.x += (mouseX * 2 - camera.position.x) * 0.05;
-            camera.position.y += (-mouseY * 2 + 5 - camera.position.y) * 0.05;
-            camera.lookAt(0, 0, 0);
-            
-            // Spin AC fan to visualize airflow
-            if (acFan) {
-                acFan.rotation.z += acFanSpeed;
+            // Idle animation for Batman model
+            if (batmanModel && currentModePhase === 'SELECT_MODE') {
+                batmanModel.rotation.y += 0.005;
             }
             
             renderer.render(scene, camera);
         }
-
-        // MQTT/WebSocket Handlers
-        socket.on('connect', function() {
-            console.log('Connected to server');
-            updateConnectionStatus(true);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
-        socket.on('disconnect', function() {
-            console.log('Disconnected from server');
-            updateConnectionStatus(false);
-        });
-
-        socket.on('mqtt_status', function(data) {
-            updateConnectionStatus(data.connected);
-        });
-
-        socket.on('gesture_command', function(data) {
-            if (data && data.finger_count !== undefined && data.finger_count !== null) {
-                updateFingerCount(data.finger_count);
-            }
-            handleGestureCommand(data);
-        });
-
-        socket.on('current_mode', function(data) {
-            updateCurrentMode(data.mode);
-        });
-
-        socket.on('finger_count', function(data) {
-            if (data && data.count !== undefined && data.count !== null) {
-                updateFingerCount(data.count);
-            } else {
-                updateFingerCount(null);
-            }
-        });
-
-        socket.on('gesture_states', function(states) {
-            if (states.TEMPERATURE) updateTemperature(states.TEMPERATURE);
-            if (states.LIGHTS) updateLights(states.LIGHTS);
-            if (states.BLINDS) updateBlinds(states.BLINDS);
-            if (states.DOOR) updateDoor(states.DOOR);
-        });
-
-        function handleGestureCommand(data) {
-            const { category, action, value } = data;
-            const cat = category ? category.toUpperCase() : '';
-            const val = (value || '').toString().toUpperCase();
-
-            // Optional AC control piggy-backed on temperature commands
-            if ((cat === 'TEMPERATURE' || cat === 'AC') && (val.includes('AC') || val === 'ON' || val === 'OFF')) {
-                updateAC(val === 'ON' || val === 'AC_ON');
-            }
-            
-            switch(cat) {
-                case 'TEMPERATURE':
-                case 'TEMP':
-                    updateTemperature(value);
-                    break;
-                case 'LIGHTS':
-                    updateLights(value);
-                    break;
-                case 'BLINDS':
-                    updateBlinds(value);
-                    break;
-                case 'DOOR':
-                    updateDoor(value);
-                    break;
-                case 'AC':
-                    updateAC(val === 'ON' || val === 'AC_ON');
-                    break;
-            }
-        }
-
-        function updateTemperature(value) {
-            roomState.temperature = parseInt(value) || roomState.temperature;
-            const valueStr = (value || '').toString().toUpperCase();
-            roomState.acOn = !valueStr.includes('OFF');
-            document.getElementById('tempStatus').textContent = roomState.acOn ? `${value} (AC ON)` : `${value} (AC OFF)`;
-
-            // Adjust AC feedback based on temperature ranges
-            if (roomState.temperature >= 75) {
-                acFanSpeed = roomState.acOn ? 0.22 : 0;
-                if (acGlow) acGlow.color.setHex(0xFF5252);
-            } else if (roomState.temperature <= 68) {
-                acFanSpeed = roomState.acOn ? 0.18 : 0;
-                if (acGlow) acGlow.color.setHex(0x00E676);
-            } else {
-                acFanSpeed = roomState.acOn ? 0.12 : 0;
-                if (acGlow) acGlow.color.setHex(0xFFC107);
-            }
-        }
-
-        function updateAC(powerOn) {
-            roomState.acOn = powerOn;
-            const statusEl = document.getElementById('tempStatus');
-            statusEl.textContent = `${roomState.temperature}°F ${powerOn ? '(AC ON)' : '(AC OFF)'}`;
-
-            acFanSpeed = powerOn ? (acFanSpeed || 0.12) : 0;
-            if (acGlow) {
-                acGlow.intensity = powerOn ? 1.0 : 0.15;
-                acGlow.color.setHex(powerOn ? 0x00e676 : 0x555555);
-            }
-        }
-
-        function updateLights(value) {
-            roomState.lights = value.toUpperCase();
-            document.getElementById('lightsStatus').textContent = roomState.lights;
-            
-            // Update lighting
-            let intensity = 0;
-            if (roomState.lights === 'ON' || roomState.lights === 'BRIGHT') {
-                intensity = 2.2;
-            } else if (roomState.lights === 'DIM') {
-                intensity = 1.1;
-            }
-            
-            // Animate light changes
-            const targetIntensity = intensity;
-            const animateLights = () => {
-                const delta = (targetIntensity - mainLight.intensity) * 0.1;
-                mainLight.intensity += delta;
-                
-                if (Math.abs(targetIntensity - mainLight.intensity) > 0.01) {
-                    requestAnimationFrame(animateLights);
-                }
-            };
-            animateLights();
-        }
-
-        function updateBlinds(value) {
-            const upper = String(value || '').toUpperCase();
-            roomState.blinds = (upper === 'CLOSED' || upper === 'SHUT') ? 'CLOSED' : 'OPEN';
-
-            document.getElementById('blindsStatus').textContent = roomState.blinds;
-
-            if (blinds) {
-                blinds.visible = true;
-                const openness = roomState.blinds === 'CLOSED' ? 0 : 1;
-                if (windowLight) windowLight.intensity = THREE.MathUtils.lerp(0.25, 1.4, openness);
-                if (sunLight) sunLight.intensity = THREE.MathUtils.lerp(0.1, 1.6, openness);
-                if (sunBeam) sunBeam.visible = openness > 0.2;
-
-                blinds.children.forEach((slat, index) => {
-                    setTimeout(() => {
-                        slat.visible = true;
-                        slat.rotation.x = THREE.MathUtils.lerp(0, -Math.PI / 1.6, openness);
-                        slat.position.z = THREE.MathUtils.lerp(0, -0.05, openness);
-                        slat.material.opacity = THREE.MathUtils.lerp(1, 0.25, openness);
-                        slat.material.transparent = true;
-                    }, index * 20);
-                });
-            }
-        }
-
-        function updateDoor(value) {
-            roomState.door = value.toUpperCase();
-            document.getElementById('doorStatus').textContent = roomState.door;
-            
-            // Update door animation
-            if (door && door.userData.pivot) {
-                const val = roomState.door;
-                const isOpen = val === 'UNLOCKED' || val === 'OPEN' || val === 'UNLOCK';
-                const closedRotation = -Math.PI / 2;
-                const targetRotation = isOpen ? 0 : closedRotation;
-                
-                const animateDoor = () => {
-                    const delta = (targetRotation - door.userData.pivot.rotation.y) * 0.1;
-                    door.userData.pivot.rotation.y += delta;
-                    
-                    if (Math.abs(targetRotation - door.userData.pivot.rotation.y) > 0.01) {
-                        requestAnimationFrame(animateDoor);
-                    }
-                };
-                animateDoor();
-                
-                // Update lock color
-                const lock = door.getObjectByName('lock');
-                if (lock) {
-                    const lockColor = isOpen ? 0x00E676 : 0xFF5252;
-                    lock.material.color.setHex(lockColor);
-                    lock.material.emissive.setHex(lockColor);
-                }
-
-                // Update door spotlight color to reflect state
-                if (doorLight) {
-                    const doorColor = isOpen ? 0x00E676 : 0xFF5252;
-                    doorLight.color.setHex(doorColor);
-                    doorLight.intensity = isOpen ? 1.3 : 1.0;
-                    doorLight.penumbra = isOpen ? 0.55 : 0.35;
-                }
-            }
-        }
-
-        function updateConnectionStatus(connected) {
-            const dot = document.getElementById('connectionDot');
-            const text = document.getElementById('connectionText');
-            
-            if (connected) {
-                dot.classList.add('connected');
-                text.textContent = 'CONNECTED';
-            } else {
-                dot.classList.remove('connected');
-                text.textContent = 'OFFLINE';
-            }
-        }
-
-        function updateCurrentMode(mode) {
-            const modeText = document.getElementById('modeText');
-            modeText.textContent = mode ? `MODE: ${mode}` : 'MODE: NONE';
-        }
-
-        function updateFingerCount(count) {
-            const fingerElement = document.getElementById('fingerText');
-            if (count === null || count === undefined) {
-                fingerElement.textContent = 'Fingers: --';
-            } else {
-                fingerElement.textContent = `Fingers: ${count}`;
-            }
-        }
-
-        // Initialize on load
-        window.addEventListener('load', init);
+        
+        // Start animation
+        animate();
+        
+        // Initialize
+        setBatmanState('READY');
+        updateLegend('SELECT_MODE', null);
     </script>
 </body>
 </html>
