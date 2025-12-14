@@ -45,7 +45,6 @@ Fall-Back Plan:
 - Documented failures and defined fallback plans to ensure the demo would still work
 
 3. Archive
-4. 
 ## Features
 
 - **Gesture Control**: Use hand gestures to control temperature, lights, blinds, and doors
