@@ -1,15 +1,57 @@
 # IDD-ASL-Alexa
 
+Viha Srinivas, Arya Prasad, Sachin Jojode, Nikhil Gangaram
+
 A gesture-controlled smart home system that uses hand gestures to control devices via MQTT, with real-time dashboard updates.
 
+1. Project plan: 
+
+Big idea: ASL Alexa is a gesture-controlled smart home assistant that lets users control household devices using American Sign Language inspired hand gestures. Instead of voice commands, the system uses a camera and computer vision to recognize hand gestures and translate them into real-time smart home actions. This makes smart home technology more accessible for Deaf and hard-of-hearing users while also exploring hands-free interaction for everyone. 
+
+Week 1: Define gestures and map them to smart home actions, Set up Python environment and MediaPipe hand tracking, Test basic gesture recognition with webcam
+
+Week 2: Implement MQTT messaging with JSON commands, Connect gesture outputs to smart home modes (lights, temperature, etc.), Build basic web dashboard layout
+
+Week 3: Add real-time dashboard updates using WebSockets, Refine gesture accuracy and reduce false triggers, User testing and debugging
+
+Week 4: Final polish and documentation, Prepare demo flow and fallback options, Final presentation and submission
+
+Parts needed: 
+Hardware: Raspberry Pi (used as the smart-home controller), MicroSD card (for Raspberry Pi OS), Power supply for Raspberry Pi, USB webcam (for hand gesture recognition), Laptop (for development, testing, and running the dashboard), Monitor, HDMI cable, keyboard, and mouse (for Raspberry Pi setup)
+
+Prototyping & Build Materials: Cardboard (to build the physical housing for the device), Clay (to secure components and shape the enclosure), Tape or glue (to hold structure together)
+
+Connectivity: Wi-Fi connection, MQTT broker access (HiveMQ public broke
+
+Fall-Back Plan:
+- If gesture recognition becomes unreliable, switch to keyboard controls that simulate gestures
+- If MQTT broker fails, log commands locally and display them only on the dashboard
+- If WebSocket live updates break, refresh dashboard manually to show latest state
+- If camera fails, use pre-recorded gesture inputs for demo purposes
+
+2. Documentation of design process
+- Identified the problem that most smart home assistants rely on voice input, which limits accessibility for Deaf and hard-of-hearing users
+- Defined the main goal as creating a gesture-based smart home assistant inspired by ASL
+- Brainstormed and sketched different hand gestures and mapped them to common smart home actions
+- Chose simple, distinct gestures to reduce confusion and improve recognition accuracy
+- Built an early technical prototype using a webcam and MediaPipe to test real-time hand tracking
+- Tested multiple gestures and adjusted or removed ones that were frequently misclassified
+- Set up the system architecture using a Raspberry Pi as the controller and MQTT for messaging
+- Developed a web dashboard to visualize commands and device states in real time
+- Used the dashboard to debug gesture recognition and system communication
+- Created a low-fidelity physical enclosure using cardboard and clay
+- Iterated on camera placement and component layout to improve stability and gesture detection
+- Conducted end-to-end testing of the full system
+- Documented failures and defined fallback plans to ensure the demo would still work
+
+3. Archive
+4. 
 ## Features
 
 - **Gesture Control**: Use hand gestures to control temperature, lights, blinds, and doors
 - **MQTT Integration**: Commands published as JSON to MQTT broker
 - **Real-time Dashboard**: Web dashboard updates instantly via WebSocket
 - **Camera-based**: Uses MediaPipe for hand gesture recognition
-
-## Quick Start
 
 ### Prerequisites
 
@@ -131,6 +173,12 @@ IDD-ASL-Alexa/
 ```bash
 PORT=8081 python3 dashboard.py
 ```
+
+
+
+
+
+
 
 ## License
 
