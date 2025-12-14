@@ -205,8 +205,6 @@ PORT=8081 python3 dashboard.py
 ```
 
 Design Patterns:
-<img width="669" height="425" alt="Screen Shot 2025-12-14 at 12 22 09 PM" src="https://github.com/user-attachments/assets/8673a2a4-0a9f-4a3b-9bd9-1e0c6123d93a" />
-
 ### Physical Form Exploration
 
 Early: 
