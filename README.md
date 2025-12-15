@@ -207,13 +207,15 @@ PORT=8081 python3 dashboard.py
 Design Patterns:
 ### Physical Form Exploration
 
-Early: 
-<img width="507" height="410" alt="Screen Shot 2025-12-14 at 12 25 12 PM" src="https://github.com/user-attachments/assets/dba5b53b-ca12-48db-aa24-12de9cbb2f08" />
+Early:
 
-Final: 
-![IMG_5254](https://github.com/user-attachments/assets/a59d0c44-cc42-4ed9-bfc9-afc4b40417d3)
-![IMG_5255](https://github.com/user-attachments/assets/ed4d81df-efd6-4898-8229-0d0597f01668)
-![IMG_5256](https://github.com/user-attachments/assets/1e8b259f-814b-4a13-bc17-e156e1077e38)
+<img src="images/felt_proto.jpeg" style="width: 60%; max-width: 500px;">
+
+Final:
+
+<img src="images/clay_1.jpeg" style="width: 30%; margin: 5px;">
+<img src="images/clay_2.jpeg" style="width: 30%; margin: 5px;">
+<img src="images/clay_3.jpeg" style="width: 30%; margin: 5px;">
 
 In the early stages of the project, we imagined ASL Alexa as something extremely soft and approachable. Our initial idea was to use felt as the primary material so the device would be lightweight, flexible, and easy for users to place anywhere on their wall. The felt concept emphasized comfort and accessibility, and it aligned with the idea that assistive technology should feel friendly rather than intimidating.
 
