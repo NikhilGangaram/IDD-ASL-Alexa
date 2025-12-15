@@ -264,3 +264,4 @@ Overall, ASL Alexa represents both a functional prototype and a learning process
 - Assisted with improving system responsiveness and feedback clarity  
 - Testing and iteration across interaction scenarios
 - Final documentation of backend and system architecture
+

@@ -334,6 +334,143 @@ BATMAN_3D_HTML = '''
         floor.receiveShadow = true;
         scene.add(floor);
         
+        // Simple 3D room pieces that react to actions
+        const roomState = {
+            lightsOn: false,
+            lightLevel: 0.6,
+            blindsOpen: false,
+            doorOpen: false,
+            acSpeed: 0
+        };
+        
+        let roomLight, bulbMesh, bulbMaterial, doorPivot, blindCover, sunPlane, windowLight, acFanGroup;
+        
+        function buildRoom() {
+            const roomGroup = new THREE.Group();
+            
+            // Walls and ceiling
+            const wallMaterial = new THREE.MeshPhongMaterial({ color: 0x0f0f12, side: THREE.DoubleSide });
+            const backWall = new THREE.Mesh(new THREE.PlaneGeometry(14, 6), wallMaterial);
+            backWall.position.set(0, 1.5, -6);
+            roomGroup.add(backWall);
+            
+            const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), wallMaterial);
+            leftWall.position.set(-6, 1.5, 0);
+            leftWall.rotation.y = Math.PI / 2;
+            roomGroup.add(leftWall);
+            
+            const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), wallMaterial);
+            rightWall.position.set(6, 1.5, 0);
+            rightWall.rotation.y = -Math.PI / 2;
+            roomGroup.add(rightWall);
+            
+            const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(14, 12), wallMaterial);
+            ceiling.position.set(0, 3, 0);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.receiveShadow = true;
+            roomGroup.add(ceiling);
+            
+            // Ceiling lamp + room light
+            bulbMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x111111 });
+            bulbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), bulbMaterial);
+            bulbMesh.position.set(0, 2.7, 0);
+            bulbMesh.castShadow = true;
+            roomGroup.add(bulbMesh);
+            
+            roomLight = new THREE.PointLight(0xfff2cc, 1.2, 25);
+            roomLight.position.copy(bulbMesh.position);
+            roomLight.castShadow = true;
+            scene.add(roomLight);
+            
+            // Window + blinds
+            const windowGroup = new THREE.Group();
+            windowGroup.position.set(6.01, 1.4, 0);
+            windowGroup.rotation.y = -Math.PI / 2;
+            
+            sunPlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.6, 1.6),
+                new THREE.MeshBasicMaterial({ color: 0xffd37a, transparent: true, opacity: 0.8 })
+            );
+            sunPlane.position.z = -0.02;
+            windowGroup.add(sunPlane);
+            
+            blindCover = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.6, 1.6),
+                new THREE.MeshPhongMaterial({ color: 0x1c1c1c, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+            );
+            blindCover.position.z = 0.02;
+            windowGroup.add(blindCover);
+            
+            const windowFrame = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.8, 1.8),
+                new THREE.MeshBasicMaterial({ color: 0x444444, side: THREE.DoubleSide })
+            );
+            windowFrame.position.z = 0.05;
+            windowGroup.add(windowFrame);
+            
+            roomGroup.add(windowGroup);
+            
+            // Door with hinge
+            doorPivot = new THREE.Object3D();
+            doorPivot.position.set(-6, -0.2, 1.5);
+            const door = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 2.4, 0.12),
+                new THREE.MeshPhongMaterial({ color: 0x3b2a1a, emissive: 0x0c0a08 })
+            );
+            door.position.set(0.6, 1.2, 0);
+            door.castShadow = true;
+            doorPivot.add(door);
+            roomGroup.add(doorPivot);
+            
+            // AC unit with spinner
+            const acBody = new THREE.Mesh(
+                new THREE.BoxGeometry(1.6, 0.8, 0.4),
+                new THREE.MeshPhongMaterial({ color: 0xbfc7ce, emissive: 0x0a0c10 })
+            );
+            acBody.position.set(2.5, 1.8, -5.6);
+            acBody.castShadow = true;
+            roomGroup.add(acBody);
+            
+            acFanGroup = new THREE.Group();
+            acFanGroup.position.copy(acBody.position);
+            const fanHub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 12), new THREE.MeshPhongMaterial({ color: 0x333333 }));
+            fanHub.rotation.x = Math.PI / 2;
+            acFanGroup.add(fanHub);
+            const bladeMaterial = new THREE.MeshPhongMaterial({ color: 0x555555 });
+            for (let i = 0; i < 3; i++) {
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.05), bladeMaterial);
+                blade.position.x = 0.45;
+                blade.rotation.z = (Math.PI * 2 / 3) * i;
+                acFanGroup.add(blade);
+            }
+            roomGroup.add(acFanGroup);
+            
+            // Sunlight coming through window
+            windowLight = new THREE.DirectionalLight(0xfff4d9, 0.2);
+            windowLight.position.set(5, 3, 2);
+            scene.add(windowLight);
+            
+            scene.add(roomGroup);
+            updateRoomVisuals();
+        }
+        
+        function updateRoomVisuals() {
+            if (!roomLight || !bulbMaterial || !blindCover || !sunPlane || !windowLight || !doorPivot) return;
+            
+            const lightIntensity = roomState.lightsOn ? 0.6 + roomState.lightLevel : 0.15;
+            roomLight.intensity = lightIntensity;
+            ambientLight.intensity = roomState.lightsOn ? 0.6 : 0.2;
+            bulbMaterial.emissive = new THREE.Color(roomState.lightsOn ? 0xffd700 : 0x111111);
+            
+            blindCover.scale.y = roomState.blindsOpen ? 0.05 : 1;
+            blindCover.material.opacity = roomState.blindsOpen ? 0.2 : 0.9;
+            sunPlane.material.opacity = roomState.blindsOpen ? 0.9 : 0.3;
+            windowLight.intensity = roomState.blindsOpen ? 0.55 : 0.15;
+            
+            doorPivot.rotation.y = roomState.doorOpen ? -Math.PI / 2 : 0;
+        }
+        buildRoom();
+        
         // Camera position
         camera.position.set(0, 2, 8);
         camera.lookAt(0, 0, 0);
@@ -431,6 +568,45 @@ BATMAN_3D_HTML = '''
             });
         }
         
+        function applyAction(mode, gesture) {
+            if (!mode || !gesture) return;
+            
+            const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+            
+            switch(mode) {
+                case 'LIGHTS':
+                    if (gesture === 'OPEN_HAND') {
+                        roomState.lightsOn = true;
+                        roomState.lightLevel = 0.9;
+                    } else if (gesture === 'FIST') {
+                        roomState.lightsOn = false;
+                    } else if (gesture === 'POINT_RIGHT') {
+                        roomState.lightsOn = true;
+                        roomState.lightLevel = clamp(roomState.lightLevel + 0.3, 0.3, 1.5);
+                    } else if (gesture === 'POINT_LEFT') {
+                        roomState.lightsOn = true;
+                        roomState.lightLevel = clamp(roomState.lightLevel - 0.3, 0.2, 1.5);
+                    }
+                    break;
+                case 'BLINDS':
+                    if (gesture === 'OPEN_HAND') roomState.blindsOpen = true;
+                    if (gesture === 'FIST') roomState.blindsOpen = false;
+                    break;
+                case 'DOOR':
+                    if (gesture === 'OPEN_HAND') roomState.doorOpen = true;
+                    if (gesture === 'FIST') roomState.doorOpen = false;
+                    break;
+                case 'TEMPERATURE':
+                    if (gesture === 'OPEN_HAND') roomState.acSpeed = Math.max(roomState.acSpeed, 1.2);
+                    if (gesture === 'FIST') roomState.acSpeed = 0;
+                    if (gesture === 'POINT_RIGHT') roomState.acSpeed = clamp(roomState.acSpeed + 0.6, 0, 4);
+                    if (gesture === 'POINT_LEFT') roomState.acSpeed = clamp(roomState.acSpeed - 0.6, 0, 4);
+                    break;
+            }
+            
+            updateRoomVisuals();
+        }
+        
         // Socket.IO event handlers
         socket.on('connect', () => {
             console.log('Connected to server');
@@ -475,6 +651,7 @@ BATMAN_3D_HTML = '''
                 document.getElementById('last-action').textContent = data.action_gesture;
                 setBatmanState(data.action_gesture);
                 highlightAction(data.action_gesture);
+                applyAction(currentLockedMode, data.action_gesture);
             }
             
             // Show/hide mode instructions
@@ -507,6 +684,11 @@ BATMAN_3D_HTML = '''
             // Idle animation for Batman model
             if (batmanModel && currentModePhase === 'SELECT_MODE') {
                 batmanModel.rotation.y += 0.005;
+            }
+            
+            // AC fan spin when on
+            if (acFanGroup && roomState.acSpeed > 0) {
+                acFanGroup.rotation.z += 0.1 * roomState.acSpeed;
             }
             
             renderer.render(scene, camera);
