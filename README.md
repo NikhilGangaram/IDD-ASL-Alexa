@@ -237,6 +237,30 @@ Finally, this project reinforced the value of accessibility-driven design. By ce
 
 Overall, ASL Alexa represents both a functional prototype and a learning process—one that emphasized iteration, cross-disciplinary thinking, and the importance of designing technology that adapts to users rather than expecting users to adapt to technology.
 
-## License
+## Team Contributions
 
-[Add your license here]
+### Viha Srinivas
+- Led product development and experience framing with a focus on accessibility for Deaf and hard-of-hearing users  
+- Defined the core interaction model, including gesture vocabulary, mode selection, and user flow  
+- Guided design tradeoffs between gesture expressiveness and system reliability  
+- Led final polish, demo preparation, and presentation structure  
+- Shaped documentation and overall project narrative  
+
+### Nikhil Gangaram
+- Set up the initial project codebase and technical pipeline  
+- Implemented the first working gesture recognition and control flow  
+- Established early end-to-end functionality from camera input to system response  
+- Provided the technical foundation for later iteration and refinement  
+
+### Arya Prasad
+- Fine-tuned gesture recognition logic to improve accuracy and reduce false triggers  
+- Integrated gesture processing with MQTT messaging and system state updates  
+- Co-developed the 3D room visualization to make system state changes visible and legible  
+- Focused on end-to-end integration, testing, and system robustness  
+
+### Sachin Jojode
+- Collaborated on refining gesture-to-action mappings and interaction behavior  
+- Co-implemented the 3D visualization layer with real-time response to gestures  
+- Assisted with improving system responsiveness and feedback clarity  
+- Testing and iteration across interaction scenarios
+- Final documentation of backend and system architecture
