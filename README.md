@@ -225,6 +225,10 @@ We moved toward a structured enclosure design that could be mounted on a wall an
 
 5. Video of someone using our project:
 
+[Interaction with Project](https://youtube.com/shorts/BRYXfxFxTMU?feature=share)
+
+[Review of Project](https://youtube.com/shorts/9atxb6zKmHE?feature=share)
+
 6. Reflection
 
 ## Project Reflection
@@ -266,4 +270,3 @@ Overall, ASL Alexa represents both a functional prototype and a learning process
 - Assisted with improving system responsiveness and feedback clarity  
 - Testing and iteration across interaction scenarios
 - Final documentation of backend and system architecture
-
