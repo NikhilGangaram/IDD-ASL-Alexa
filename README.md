@@ -108,7 +108,7 @@ pip install -r requirements.txt
 
 **Terminal 1 - Start Dashboard:**
 ```bash
-python3 dashboard.py
+python3 batman_room_3d.py
 ```
 Open browser to `http://localhost:8080`
 

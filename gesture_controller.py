@@ -38,8 +38,8 @@ class GestureRecognizer:
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=1,
-            min_detection_confidence=0.7,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.5,  # Lowered for better detection
+            min_tracking_confidence=0.3    # Lowered for better tracking
         )
         self.mp_draw = mp.solutions.drawing_utils
         
@@ -54,7 +54,7 @@ class GestureRecognizer:
         self.current_frame = None
         self.hand_landmarks = None
         self.last_gesture = None
-        self.finger_count_buffer = deque(maxlen=5)
+        self.finger_count_buffer = deque(maxlen=40)  # Support up to 2 seconds at 20 FPS
         self.action_buffer = deque(maxlen=3)
         
         # Confidence tracking
@@ -87,71 +87,132 @@ class GestureRecognizer:
         return True
 
     def get_hand_scale(self):
-        """Calculate hand scale based on palm width for dynamic thresholds"""
+        """Calculate hand scale based on palm dimensions for dynamic thresholds"""
         if not self.hand_landmarks:
             return 0.15
-        
+
         lms = self.hand_landmarks.landmark
-        wrist = (lms[0].x, lms[0].y)
-        middle_mcp = (lms[9].x, lms[9].y)
-        palm_height = math.hypot(middle_mcp[0] - wrist[0], middle_mcp[1] - wrist[1])
-        
-        index_mcp = (lms[5].x, lms[5].y)
-        pinky_mcp = (lms[17].x, lms[17].y)
-        palm_width = math.hypot(pinky_mcp[0] - index_mcp[0], pinky_mcp[1] - index_mcp[1])
-        
-        return (palm_height + palm_width) / 2
+
+        # More robust hand scale calculation
+        # Use distance from wrist to middle finger MCP (palm height)
+        wrist = np.array([lms[0].x, lms[0].y])
+        middle_mcp = np.array([lms[9].x, lms[9].y])
+        palm_height = np.linalg.norm(middle_mcp - wrist)
+
+        # Use distance between index and pinky MCPs (palm width)
+        index_mcp = np.array([lms[5].x, lms[5].y])
+        pinky_mcp = np.array([lms[17].x, lms[17].y])
+        palm_width = np.linalg.norm(pinky_mcp - index_mcp)
+
+        # Also consider the span from thumb to pinky
+        thumb_cmc = np.array([lms[1].x, lms[1].y])
+        pinky_cmc = np.array([lms[17].x, lms[17].y])
+        hand_span = np.linalg.norm(pinky_cmc - thumb_cmc)
+
+        # Return average of these measurements for more stable scaling
+        return (palm_height + palm_width + hand_span) / 3
 
     def get_finger_count(self):
         """Detect and return the stabilized number of fingers held up (0-5)"""
         if not self.hand_landmarks:
             self.finger_count_buffer.append(None)
             return self._get_stable_finger_count()
-        
+
         lms = self.hand_landmarks.landmark
         fingers = []
-        
-        # Check which fingers are open
-        fingers.append(1 if lms[8].y < lms[7].y else 0)   # Index
-        fingers.append(1 if lms[12].y < lms[11].y else 0) # Middle
-        fingers.append(1 if lms[16].y < lms[15].y else 0) # Ring
-        fingers.append(1 if lms[20].y < lms[19].y else 0) # Pinky
-        
+
+        # Robust finger detection using vector-based approach
+        # Check if fingertip is extended beyond the middle joint (works with different orientations)
+        finger_indices = [
+            (8, 7, 6, 5),   # Index: tip, DIP, PIP, MCP
+            (12, 11, 10, 9), # Middle: tip, DIP, PIP, MCP
+            (16, 15, 14, 13), # Ring: tip, DIP, PIP, MCP
+            (20, 19, 18, 17)  # Pinky: tip, DIP, PIP, MCP
+        ]
+
+        for tip_idx, dip_idx, pip_idx, mcp_idx in finger_indices:
+            # Calculate vectors from MCP to PIP and PIP to tip
+            mcp_to_pip_x = lms[pip_idx].x - lms[mcp_idx].x
+            mcp_to_pip_y = lms[pip_idx].y - lms[mcp_idx].y
+            pip_to_tip_x = lms[tip_idx].x - lms[pip_idx].x
+            pip_to_tip_y = lms[tip_idx].y - lms[pip_idx].y
+
+            # Calculate the angle between the two vectors
+            dot_product = mcp_to_pip_x * pip_to_tip_x + mcp_to_pip_y * pip_to_tip_y
+            mag1 = math.hypot(mcp_to_pip_x, mcp_to_pip_y)
+            mag2 = math.hypot(pip_to_tip_x, pip_to_tip_y)
+
+            if mag1 > 0 and mag2 > 0:
+                cos_angle = dot_product / (mag1 * mag2)
+                cos_angle = max(-1, min(1, cos_angle))  # Clamp to avoid numerical issues
+                angle = math.acos(cos_angle)
+
+                # Finger is extended if the angle is small (finger is relatively straight)
+                finger_extended = angle < math.pi / 3  # ~60 degrees
+            else:
+                # Fallback to simple distance check if vectors are too small
+                tip_to_pip_dist = math.hypot(pip_to_tip_x, pip_to_tip_y)
+                finger_extended = tip_to_pip_dist > 0.05  # Arbitrary threshold
+
+            fingers.append(1 if finger_extended else 0)
+
         total_fingers = sum(fingers)
-        
-        # Dynamic thumb detection using hand scale
-        hand_scale = self.get_hand_scale()
-        thumb_threshold = hand_scale * 1.3
-        
+
+        # Improved thumb detection - more reliable approach
         thumb_extended = False
-        thumb_distance = math.hypot(lms[4].x - lms[17].x, lms[4].y - lms[17].y)
-        if thumb_distance > thumb_threshold:
+
+        # Method 1: Check if thumb tip is far from thumb base (simplified)
+        thumb_base_to_tip = math.hypot(lms[4].x - lms[2].x, lms[4].y - lms[2].y)
+        hand_scale = self.get_hand_scale()
+        thumb_threshold = hand_scale * 0.6  # More reasonable threshold
+
+        # Method 2: Check if thumb tip is positioned away from palm center
+        palm_center_x = (lms[0].x + lms[9].x) / 2
+        palm_center_y = (lms[0].y + lms[9].y) / 2
+        thumb_to_palm_center = math.hypot(lms[4].x - palm_center_x, lms[4].y - palm_center_y)
+
+        # Method 3: Check relative position to index finger
+        thumb_vs_index = math.hypot(lms[4].x - lms[5].x, lms[4].y - lms[5].y)
+
+        # Thumb is extended if ANY of these conditions are met (more lenient)
+        if (thumb_base_to_tip > thumb_threshold or
+            thumb_to_palm_center > hand_scale * 0.8 or
+            thumb_vs_index > hand_scale * 0.4):
             thumb_extended = True
-        
+
         if thumb_extended:
             total_fingers += 1
-        
+
         self.finger_count_buffer.append(total_fingers)
         return self._get_stable_finger_count()
     
     def _get_stable_finger_count(self):
-        """Get stabilized finger count from buffer"""
+        """Get stabilized finger count from buffer with different timing requirements"""
         valid_counts = [c for c in self.finger_count_buffer if c is not None]
         if not valid_counts:
             return None
         
-        if len(valid_counts) < 3:
-            return None
-        
+        # Get the most recent stable count for analysis
         count_freq = Counter(valid_counts)
         most_common = count_freq.most_common(1)[0]
-        
-        if len(set(valid_counts[-3:])) == 1:
-            self.finger_count_stable_frames = min(self.finger_count_stable_frames + 1, 5)
+        detected_count = most_common[0]
+
+        # Same stability requirements for all finger counts (0.5 seconds)
+        stability_window = 10  # 0.5 seconds at 20 FPS
+        max_stable_frames = 10
+        min_frames_required = 8  # Require at least 8 valid frames
+
+        if len(valid_counts) < min_frames_required:
+            return None
+
+        # Check if recent frames are consistent
+        recent_counts = valid_counts[-stability_window:]
+        if len(set(recent_counts)) == 1 and len(recent_counts) >= stability_window:
+            self.finger_count_stable_frames = min(self.finger_count_stable_frames + 1, max_stable_frames)
         else:
             self.finger_count_stable_frames = 0
         
-        return most_common[0]
+        return detected_count
     
     def get_action_gesture(self):
         """Detect action gestures with fixed logic order"""
@@ -243,11 +304,19 @@ class GestureRecognizer:
                 y_offset += 30
             
             if detected_fingers is not None:
-                stability_indicator = "*" * self.finger_count_stable_frames
-                cv2.putText(img, f"Fingers: {detected_fingers} {stability_indicator}", 
+                stability_required = 8  # Same for all fingers now
+                stability_percent = min(100, int((self.finger_count_stable_frames / stability_required) * 100))
+                stability_indicator = "*" * min(self.finger_count_stable_frames, 10)  # Limit display length
+
+                # Add hand scale info for debugging
+                hand_scale = self.get_hand_scale()
+                cv2.putText(img, f"Fingers: {detected_fingers} {stability_indicator} ({stability_percent}%)",
                            (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                y_offset += 30
+                cv2.putText(img, f"Scale: {hand_scale:.3f} | Conf: {self.detection_confidence:.2f}",
+                           (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
             else:
-                cv2.putText(img, "Fingers: None", (10, y_offset), 
+                cv2.putText(img, "Fingers: None", (10, y_offset),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
             y_offset += 30
             
@@ -267,6 +336,34 @@ class GestureRecognizer:
             self.debug_enabled = False
             print(f"[INFO] Debug overlay disabled: {e}")
     
+    def reset_camera(self):
+        """Reset camera state and clear buffers for fresh detection"""
+        print("[CAMERA] Resetting camera state...")
+
+        # Clear all detection buffers and state
+        self.finger_count_buffer.clear()
+        self.action_buffer.clear()
+        self.finger_count_stable_frames = 0
+        self.current_frame = None
+        self.hand_landmarks = None
+        self.last_gesture = None
+        self.detection_confidence = 0.0
+
+        # Reinitialize MediaPipe hands for fresh detection
+        try:
+            self.hands.close()
+            self.hands = self.mp_hands.Hands(
+                static_image_mode=False,
+                max_num_hands=1,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.3
+            )
+            print("[CAMERA] MediaPipe hands reinitialized")
+        except Exception as e:
+            print(f"[WARN] Could not reinitialize MediaPipe: {e}")
+
+        print("[CAMERA] Reset complete")
+
     def close(self):
         self.cap.release()
         if self.debug_enabled:
@@ -462,6 +559,11 @@ def main():
     mode_lock_time = 0
     action_cooldown = 0.5
     mode_timeout = 5.0
+
+    # Stability requirements for mode locking based on finger count
+    def get_stability_requirement(finger_count):
+        """Get required stable frames for mode locking - same for all finger counts"""
+        return 8  # All fingers require ~0.4 seconds of stability
     
     # Main loop
     try:
@@ -472,6 +574,16 @@ def main():
             
             finger_count = recognizer.get_finger_count()
             action_gesture = recognizer.get_action_gesture()
+
+            # Debug: Print detection status every few frames
+            if hasattr(recognizer, '_debug_counter'):
+                recognizer._debug_counter = (recognizer._debug_counter + 1) % 30  # Every ~1.5 seconds at 20 FPS
+            else:
+                recognizer._debug_counter = 0
+
+            if recognizer._debug_counter == 0:
+                hand_status = "DETECTED" if recognizer.hand_landmarks else "NOT DETECTED"
+                print(f"[DEBUG] Hand {hand_status} | Fingers: {finger_count} | Confidence: {recognizer.detection_confidence:.2f}")
             
             # Send telemetry
             telemetry = {
@@ -495,7 +607,8 @@ def main():
             if mode_phase == "SELECT_MODE":
                 if finger_count is not None:
                     if 1 <= finger_count <= 4:
-                        if finger_count == last_finger_count and recognizer.finger_count_stable_frames >= 3:
+                        stability_required = get_stability_requirement(finger_count)
+                        if finger_count == last_finger_count and recognizer.finger_count_stable_frames >= stability_required:
                             mode_lock_frames += 1
                             
                             if mode_lock_frames >= mode_lock_threshold:
@@ -523,6 +636,10 @@ def main():
                     last_action = None
                     mode_lock_frames = 0
                     last_finger_count = None
+
+                    # Reset camera for fresh detection
+                    recognizer.reset_camera()
+
                     print("[READY] Hold up 1-4 fingers to select mode...")
                     continue
                 
